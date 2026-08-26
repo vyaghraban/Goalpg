@@ -60,6 +60,9 @@ self.addEventListener("message", (event) => {
       icon: "./icon-192.png",
       badge: "./icon-192.png",
       tag: "checkpoint-nudge",
+      renotify: true,
+      requireInteraction: true,
+      vibrate: [120, 60, 120],
     }).catch(() => {});
   }
   // Ongoing "session in progress" notification — replaced in place (same
@@ -93,6 +96,9 @@ self.addEventListener("periodicsync", (event) => {
         icon: "./icon-192.png",
         badge: "./icon-192.png",
         tag: "checkpoint-nudge",
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [120, 60, 120],
       }).catch(() => {})
     );
   }
@@ -113,6 +119,9 @@ function maybeNotify() {
     icon: "./icon-192.png",
     badge: "./icon-192.png",
     tag: "daily-nudge",
+    renotify: true,
+    requireInteraction: true,
+    vibrate: [120, 60, 120],
   }).catch(() => {});
 }
 

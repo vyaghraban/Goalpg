@@ -651,7 +651,7 @@ function runNineAmReminderIfPending(){
 // Nudges every ~2 hours through the study day (not just once, like the 9am
 // reminder) — reuses the existing state.checkpointsShown map so each hour
 // mark only fires once per day.
-const CHECKPOINT_HOURS = [10, 12, 14, 16, 18, 20, 22];
+const CHECKPOINT_HOURS = [11, 13, 15, 17, 19, 21, 23];
 function checkpointReminderPending(){
   const hour = new Date().getHours();
   if (!CHECKPOINT_HOURS.includes(hour)) return false;
