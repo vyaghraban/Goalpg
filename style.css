@@ -35,7 +35,7 @@ body{
 @media (prefers-reduced-motion: reduce){
   *{animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important;}
 }
-button{font-family:inherit;}
+button{font-family:inherit; color:inherit;}
 a{color:inherit; text-decoration:none;}
 
 /* ============================================================
@@ -114,11 +114,14 @@ a{color:inherit; text-decoration:none;}
 .pulse-status.even{color:var(--text-mid); background:rgba(255,255,255,0.06);}
 .score-row{display:flex; align-items:baseline; gap:10px; margin-top:6px;}
 .score-num{font-family:var(--font-display); font-weight:700; font-size:52px; line-height:1; letter-spacing:-0.02em;}
+.score-num.pop{animation: scorePop .5s cubic-bezier(.22,1,.36,1);}
+@keyframes scorePop{ 0%{ transform:scale(1); } 35%{ transform:scale(1.28); color:var(--mint); } 100%{ transform:scale(1); } }
 .score-vs{font-family:var(--font-mono); font-size:13px; color:var(--text-mid);}
 canvas#ekg{display:block; width:100%; height:88px; margin-top:6px;}
 .pulse-foot{display:flex; justify-content:space-between; align-items:center; font-family:var(--font-mono); font-size:11px; color:var(--text-low); padding:2px 2px 12px;}
 .flame-row{display:flex; align-items:center; gap:5px;}
-.flame-ic{display:inline-block; filter: drop-shadow(0 0 6px rgba(255,140,60,0.5));}
+.flame-ic{display:inline-block; filter: drop-shadow(0 0 6px rgba(255,140,60,0.5)); animation: flameBreathe 1.8s ease-in-out infinite;}
+@keyframes flameBreathe{ 0%,100%{ transform:scale(1); filter:drop-shadow(0 0 6px rgba(255,140,60,0.5)); } 50%{ transform:scale(1.14); filter:drop-shadow(0 0 12px rgba(255,140,60,0.85)); } }
 
 /* ---------- level card ---------- */
 .level-card{
@@ -140,8 +143,15 @@ canvas#ekg{display:block; width:100%; height:88px; margin-top:6px;}
 .level-title-row{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
 .level-title{font-family:var(--font-display); font-weight:700; font-size:13.5px;}
 .level-xp-text{font-family:var(--font-mono); font-size:10.5px; color:var(--text-mid);}
-.xp-bar-track{height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden;}
-.xp-bar-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), var(--mint)); transition: width .5s ease;}
+.xp-bar-track{height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; position:relative;}
+.xp-bar-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), var(--mint)); transition: width .6s cubic-bezier(.22,1,.36,1); position:relative; overflow:hidden;}
+.xp-bar-fill::after{
+  content:""; position:absolute; inset:0;
+  background:linear-gradient(90deg, transparent, rgba(255,255,255,0.55), transparent);
+  width:40%; transform:translateX(-120%);
+  animation: xpShimmer 2.6s ease-in-out infinite;
+}
+@keyframes xpShimmer{ 0%{transform:translateX(-120%);} 60%,100%{transform:translateX(280%);} }
 
 /* ---------- quote banner ---------- */
 .quote-banner{
@@ -276,7 +286,7 @@ canvas#ekg{display:block; width:100%; height:88px; margin-top:6px;}
 .quick-card{border-radius:var(--radius-md); padding:14px; display:flex; flex-direction:column; gap:6px; transition:transform .15s ease;}
 .quick-card:active{transform:scale(0.97);}
 .quick-ic{font-size:22px;}
-.quick-title{font-family:var(--font-display); font-weight:700; font-size:13px;}
+.quick-title{font-family:var(--font-display); font-weight:700; font-size:13px; color:var(--text-hi);}
 .quick-sub{font-size:10.5px; color:var(--text-mid);}
 
 /* ---------- subject cards ---------- */
@@ -431,7 +441,8 @@ canvas#xpChart{width:100%; height:110px; display:block;}
 .nav-item{display:flex; flex-direction:column; align-items:center; gap:2px; color:var(--text-low); font-size:10px; font-weight:600; padding:4px 14px; border-radius:12px; transition:color .15s ease; background:none; border:none; font-family:inherit; cursor:pointer;}
 .nav-item .nav-ic{font-size:18px; filter:grayscale(1); opacity:0.6; transition:all .15s ease;}
 .nav-item.active{color:var(--mint);}
-.nav-item.active .nav-ic{filter:none; opacity:1; transform:translateY(-1px);}
+.nav-item.active .nav-ic{filter:none; opacity:1; animation: navBounce .38s cubic-bezier(.34,1.56,.64,1);}
+@keyframes navBounce{ 0%{transform:translateY(0) scale(1);} 40%{transform:translateY(-6px) scale(1.22);} 100%{transform:translateY(-1px) scale(1);} }
 
 .install-hint{margin-top:22px; text-align:center; font-size:11px; color:var(--text-low);}
 .page-title-row{display:flex; align-items:center; gap:10px; margin-bottom:16px;}
@@ -528,6 +539,16 @@ canvas#weekCumChart{width:100%; height:110px; display:block;}
 .view{display:none;}
 .view.active{display:block; animation: viewIn .25s ease;}
 @keyframes viewIn{ from{ opacity:0; transform:translateY(6px); } to{ opacity:1; transform:translateY(0); } }
+.view.active .quick-card{ animation: cardRise .42s cubic-bezier(.22,1,.36,1) backwards; }
+.view.active .quick-card:nth-child(1){ animation-delay: .04s; }
+.view.active .quick-card:nth-child(2){ animation-delay: .09s; }
+.view.active .quick-card:nth-child(3){ animation-delay: .14s; }
+.view.active .quick-card:nth-child(4){ animation-delay: .19s; }
+.view.active .quest-row{ animation: cardRise .38s cubic-bezier(.22,1,.36,1) backwards; }
+.view.active .quest-row:nth-child(1){ animation-delay: .06s; }
+.view.active .quest-row:nth-child(2){ animation-delay: .11s; }
+.view.active .quest-row:nth-child(3){ animation-delay: .16s; }
+@keyframes cardRise{ from{ opacity:0; transform:translateY(10px) scale(0.97); } to{ opacity:1; transform:translateY(0) scale(1); } }
 .quick-card{cursor:pointer; border:none; text-align:left; font-family:inherit; width:100%;}
 
 /* ---------- log-detail card (shown after Stop on the study timer) ---------- */

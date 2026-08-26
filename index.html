@@ -492,7 +492,11 @@ function renderHome(){
 
   const todayScore = Math.round(scoreForDate(today));
   const yesterdayScore = Math.round(scoreForDate(yesterdayStr()));
-  document.getElementById("todayScore").textContent = todayScore;
+  const scoreEl = document.getElementById("todayScore");
+  if (scoreEl.textContent !== String(todayScore) && !firstRender){
+    scoreEl.classList.remove("pop"); void scoreEl.offsetWidth; scoreEl.classList.add("pop");
+  }
+  scoreEl.textContent = todayScore;
   document.getElementById("vsLabel").textContent = `vs ${yesterdayScore} yesterday`;
 
   const statusEl = document.getElementById("pulseStatus");

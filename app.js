@@ -647,6 +647,43 @@ function runNineAmReminderIfPending(){
   return true;
 }
 
+/* ================= 2-HOURLY "KEEP GOING" CHECK-IN ================= */
+// Nudges every ~2 hours through the study day (not just once, like the 9am
+// reminder) — reuses the existing state.checkpointsShown map so each hour
+// mark only fires once per day.
+const CHECKPOINT_HOURS = [10, 12, 14, 16, 18, 20, 22];
+function checkpointReminderPending(){
+  const hour = new Date().getHours();
+  if (!CHECKPOINT_HOURS.includes(hour)) return false;
+  if (!state.checkpointsShown) state.checkpointsShown = {};
+  return !state.checkpointsShown[`${todayStr()}-${hour}`];
+}
+function runCheckpointReminderIfPending(){
+  if (!checkpointReminderPending()) return false;
+  if (!state.checkpointsShown) state.checkpointsShown = {};
+  const hour = new Date().getHours();
+  const key = `${todayStr()}-${hour}`;
+  state.checkpointsShown[key] = true;
+  // keep only today's marks so this map never grows unbounded
+  Object.keys(state.checkpointsShown).forEach(k=>{ if (!k.startsWith(todayStr())) delete state.checkpointsShown[k]; });
+  saveState(state);
+
+  const todayScore = Math.round(scoreForDate(todayStr()));
+  const title = "2-hour check-in ⏰";
+  const nudgeLines = [
+    `Ab tak ${todayScore} XP — ek aur session daal do 📖`,
+    `${todayScore} XP ho gaya — momentum mat todo, chalo ek aur push!`,
+    `Padhai Clock khol ke agla session start karo — abhi ${todayScore} XP hai.`,
+  ];
+  const body = todayScore > 0
+    ? nudgeLines[Math.floor(hour/2) % nudgeLines.length]
+    : "Abhi tak kuch log nahi hua — chalo ek session shuru karte hain!";
+  sendNotification(title, body);
+  toast(body);
+  if (document.getElementById("moodOverlay")) showRevealOverlay("up", title, body, "⏰");
+  return true;
+}
+
 // Called on every page load, every few minutes while the app is open, and on
 // tab-focus — runs the once-a-day checks (midnight day-close/kickoff, and the
 // 9am start-study nudge). Note: true delivery when the app/tab is fully
@@ -655,7 +692,8 @@ function runNineAmReminderIfPending(){
 // moment the app is opened or brought to the foreground.
 function runDailyRemindersCheck(){
   if (runDailyKickoffIfPending()) return;
-  runNineAmReminderIfPending();
+  if (runNineAmReminderIfPending()) return;
+  runCheckpointReminderIfPending();
 }
 
 /* ================= GRAPH DECLINE ALERT ================= */
