@@ -1,0 +1,1830 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>NeetPG Ranker</title>
+<meta name="description" content="Vansh's gamified NEET PG study tracker." />
+<meta name="theme-color" content="#070912" />
+<link rel="manifest" href="./manifest.json" />
+<link rel="icon" href="./icon-192.png" />
+<link rel="apple-touch-icon" href="./icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./style.css" />
+</head>
+<body>
+
+<div class="bg-base"></div>
+<div class="glass-bg"><div class="spin-conic"></div><span class="orb o1"></span><span class="orb o2"></span><span class="orb o3"></span></div>
+<div class="glass-sheen"></div>
+
+<div class="wrap">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2 6 4-16 2 10 2-5h6" stroke="#00E5A8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </div>
+      <div>
+        <div class="brand-name">NeetPG Ranker</div>
+        <div class="brand-sub" id="dateLabel">—</div>
+      </div>
+    </div>
+    <button type="button" class="rank-chip glass" id="liveSessionChip" data-view="study" style="display:none; border:none; cursor:pointer; margin-right:8px; color:var(--mint);">
+      <span class="rank-dot" style="background:var(--mint);"></span>
+      <span id="liveSessionTime">00:00:00</span>
+    </button>
+    <div class="rank-chip glass" id="rankChip">
+      <span class="rank-dot" id="rankDot"></span>
+      <span id="rankLabel">Noob</span>
+    </div>
+  </div>
+
+  <!-- ======================================================= -->
+  <!-- VIEW: HOME                                               -->
+  <!-- ======================================================= -->
+  <section class="view active" id="view-home">
+
+    <div class="quote-banner glass" id="quoteBanner">✨ <span id="quoteText">—</span></div>
+
+    <!-- SIGNATURE: live EKG pulse card, "beat yesterday" made literal -->
+    <div class="pulse-card glass">
+      <div class="pulse-top">
+        <div>
+          <div class="pulse-label">Today vs Yesterday</div>
+          <div class="score-row">
+            <div class="score-num" id="todayScore">0</div>
+            <div class="score-vs" id="vsLabel">vs 0 yesterday</div>
+          </div>
+        </div>
+        <div class="pulse-status even" id="pulseStatus">Even</div>
+      </div>
+      <canvas id="ekg"></canvas>
+      <div class="pulse-foot">
+        <span class="flame-row"><span class="flame-ic" id="flameIc">🔥</span><span id="streakLabel">0-day streak</span></span>
+        <span id="progressLabel">Phase —</span>
+      </div>
+    </div>
+
+    <!-- Duel Arena: today's Vansh vs yesterday's Vansh, driven by logged study sessions -->
+    <div class="duel-card glass" id="duelCard">
+      <div class="duel-head">⚔️ Aaj wala Vansh <span class="duel-vs-chip">VS</span> Kal wala Vansh</div>
+      <div class="duel-row">
+        <div class="duel-fighter">
+          <div class="duel-ic">🥷</div>
+          <div class="duel-name">Naya Vansh</div>
+          <div class="duel-xp mint" id="duelTodayXp">0 XP</div>
+        </div>
+        <div class="duel-fighter">
+          <div class="duel-ic">👤</div>
+          <div class="duel-name">Purana Vansh</div>
+          <div class="duel-xp coral" id="duelYestXp">0 XP</div>
+        </div>
+      </div>
+      <div class="duel-bar-track">
+        <div class="duel-bar-fill-left" id="duelFillLeft" style="width:50%"></div>
+        <div class="duel-bar-fill-right" id="duelFillRight" style="width:50%"></div>
+      </div>
+      <div class="duel-round" id="duelRound">0 sessions aaj · 0 kal</div>
+      <div class="duel-yesterday" id="duelYesterdayResult"></div>
+    </div>
+
+    <!-- Level / XP gaming layer -->
+    <div class="level-card">
+      <div class="level-badge">
+        <div class="lv-num" id="lvNum">1</div>
+        <div class="lv-tag">LVL</div>
+      </div>
+      <div class="level-info">
+        <div class="level-title-row">
+          <div class="level-title" id="lvTitle">Rookie Grinder</div>
+          <div class="level-xp-text" id="lvXpText">0 / 60 XP</div>
+        </div>
+        <div class="xp-bar-track"><div class="xp-bar-fill" id="lvBarFill" style="width:0%"></div></div>
+      </div>
+    </div>
+
+    <div class="phase-banner glass">
+      <div class="ic" id="phaseIcon">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-14 9V3z" fill="#052A20"/></svg>
+      </div>
+      <div>
+        <div class="phase-title" id="phaseTitle">Video Phase</div>
+        <div class="phase-desc" id="phaseDesc">First-watch every subject to unlock Reading</div>
+      </div>
+    </div>
+
+    <!-- Weekly Boss Battle -->
+    <div class="boss-card" id="bossCard">
+      <div class="boss-top">
+        <div class="boss-id">
+          <div class="boss-ic" id="bossIc">👹</div>
+          <div>
+            <div class="boss-name" id="bossName">Week Boss #1</div>
+            <div class="boss-sub" id="bossSub">Log XP this week to deal damage</div>
+          </div>
+        </div>
+        <div class="boss-hp-text" id="bossHpText">0 / 450</div>
+      </div>
+      <div class="boss-hp-track"><div class="boss-hp-fill" id="bossHpFill" style="width:0%"></div></div>
+      <div id="bossStatusRow"></div>
+    </div>
+
+    <div class="chest-cta glass" id="chestCta" style="display:none;">
+      <div class="chest-ic">🎁</div>
+      <div>
+        <div class="chest-title">Mystery Chest unlocked!</div>
+        <div class="chest-sub" id="chestSub">Tap to open — streak milestone reward</div>
+      </div>
+      <div class="chest-arrow">→</div>
+    </div>
+
+    <div class="trip-cta glass" id="tripCta" style="display:none;">
+      <div class="trip-ic">🧳</div>
+      <div>
+        <div class="trip-title">4-5 Day Trip unlocked!</div>
+        <div class="trip-sub" id="tripSub">10-day streak reward — tap to claim</div>
+      </div>
+      <div class="trip-arrow">→</div>
+    </div>
+
+    <!-- Week report ready — surfaces Saturday night onward -->
+    <div class="report-cta glass" id="reportCta" style="display:none;">
+      <div class="ric">🗓️</div>
+      <div>
+        <div class="rictitle">Hafte ka report ready hai!</div>
+        <div class="ricsub" id="reportCtaSub">Tap to see the week's Vansh</div>
+      </div>
+      <div class="ricarrow">→</div>
+    </div>
+
+    <div class="sec-head">
+      <div class="sec-title">Jump to</div>
+    </div>
+    <div class="quick-grid">
+      <button type="button" class="quick-card glass" data-view="study">
+        <div class="quick-ic">⏱️</div>
+        <div class="quick-title">Padhai Clock</div>
+        <div class="quick-sub" id="quickStudySub">Start timer / log work</div>
+      </button>
+      <button type="button" class="quick-card glass" data-view="progress">
+        <div class="quick-ic">📊</div>
+        <div class="quick-title">Progress</div>
+        <div class="quick-sub">Trends, streak heatmap, XP</div>
+      </button>
+      <button type="button" class="quick-card glass" data-view="progress" data-scroll="weekReportSection">
+        <div class="quick-ic">🗓️</div>
+        <div class="quick-title">Week Report</div>
+        <div class="quick-sub" id="quickReportSub">This week's Vansh</div>
+      </button>
+      <button type="button" class="quick-card glass" data-view="rewards">
+        <div class="quick-ic">🏆</div>
+        <div class="quick-title">Badges & Rewards</div>
+        <div class="quick-sub" id="quickBadgeSub">0/0 unlocked</div>
+      </button>
+    </div>
+
+    <div class="sec-head">
+      <div class="sec-title">Today's quests</div>
+      <button type="button" class="sec-sub" data-view="rewards" style="color:var(--mint); background:none; border:none; cursor:pointer; font-family:var(--font-mono);">see all →</button>
+    </div>
+    <div class="quest-card glass"><div id="questList"></div></div>
+
+    <div class="install-hint">Install this app: browser menu → "Add to Home Screen"</div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- VIEW: STUDY (Padhai Clock + manual log)                  -->
+  <!-- ======================================================= -->
+  <section class="view" id="view-study" hidden>
+
+    <div class="sec-head" style="margin-top:0;"><div class="sec-title">Padhai Clock</div></div>
+
+    <!-- The clock itself: 00:00, ticks every second, Start/Stop is the only control -->
+    <div class="stopwatch-card glass" id="stopwatchCard">
+      <div class="stopwatch-live"><span class="dot"></span>Lagatar chal raha hai</div>
+      <div class="stopwatch-display" id="swDisplay">00:00:00</div>
+      <div class="stopwatch-since" id="swSince">Baitho aur Start dabao</div>
+      <button type="button" class="stopwatch-btn" id="swBtn">
+        <span class="sw-ic" id="swIc">▶</span>
+        <span id="swLabel">Start</span>
+      </button>
+    </div>
+
+    <!-- Appears right after Stop: log what was actually studied in that sitting -->
+    <div class="logdetail-card glass" id="logDetailCard" style="display:none;"></div>
+
+    <div class="best-sit-card glass">
+      <div class="sec-head" style="margin:0 0 12px;"><div class="sec-title">Best sitting: aaj vs kal</div></div>
+      <div class="best-sit-row" id="bestSitRow"></div>
+      <div class="best-sit-verdict" id="bestSitVerdict"></div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Aaj ka sitting trend</div><div class="sec-sub">session-by-session, aaj vs kal</div></div>
+    <div class="chart-card glass">
+      <canvas id="sessionTrendChart"></canvas>
+      <div class="week-legend">
+        <span><span class="dot mint"></span>Aaj (cumulative)</span>
+        <span><span class="dot coral"></span>Kal (cumulative)</span>
+      </div>
+      <div class="best-sit-verdict" id="sessionTrendVerdict" style="margin-top:10px;"></div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Best sitting per day</div><div class="sec-sub">last 7 days</div></div>
+    <div class="chart-card glass">
+      <canvas id="sitChart"></canvas>
+      <div class="chart-legend"><span id="sitStart">–</span><span>Today</span></div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Aaj ke sessions</div><div class="sec-sub" id="todayFocusTotal">0m total</div></div>
+    <div class="best-sit-card glass"><div class="session-list" id="sessionList"></div></div>
+
+    <div class="sec-head"><div class="sec-title">Manual log</div><div class="sec-sub">bina timer ke seedha log karo</div></div>
+    <div class="combo-strip" id="comboStrip"></div>
+    <div class="log-card glass" id="logCard"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">Subjects</div>
+      <div class="tabbar glass" id="subjTabs">
+        <button type="button" data-tab="video" class="active">Video</button>
+        <button type="button" data-tab="reading">Reading</button>
+      </div>
+    </div>
+    <div class="subject-grid" id="subjectGrid"></div>
+
+    <div class="install-hint">Ek session = ek lagatar sitting. Start karo, jab tak padho chalne do, uthte waqt Stop dabao — phir kya padha likh do.</div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- VIEW: PROGRESS (+ Week Report merged in)                 -->
+  <!-- ======================================================= -->
+  <section class="view" id="view-progress" hidden>
+
+    <div class="sec-head" style="margin-top:0;"><div class="sec-title">Progress</div></div>
+
+    <div class="stat-grid">
+      <div class="stat-card glass">
+        <div class="stat-ic">🏅</div>
+        <div class="stat-val" id="statBestDay">0</div>
+        <div class="stat-label">Best day score ever</div>
+      </div>
+      <div class="stat-card glass">
+        <div class="stat-ic">🔥</div>
+        <div class="stat-val" id="statBestStreak">0</div>
+        <div class="stat-label">Longest streak ever</div>
+      </div>
+    </div>
+
+    <div class="sec-head" style="margin-top:0;"><div class="sec-title">Consistency</div><div class="sec-sub">last 70 days</div></div>
+    <div class="heat-card glass">
+      <div class="heat-grid" id="heatmapGrid"></div>
+      <div class="heat-legend">
+        <span>Less</span>
+        <span class="heat-cell"></span><span class="heat-cell lvl1"></span><span class="heat-cell lvl2"></span><span class="heat-cell lvl3"></span><span class="heat-cell lvl4"></span>
+        <span>More</span>
+      </div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Score trend</div><div class="sec-sub">last 14 days</div></div>
+    <div class="chart-card glass">
+      <canvas id="trendChart"></canvas>
+      <div class="chart-legend"><span id="trendStart">–</span><span>Today</span></div>
+      <div class="rank-strip">
+        <div class="rank-tier glass" data-tier="noob">NOOB</div>
+        <div class="rank-tier glass" data-tier="pro">PRO</div>
+        <div class="rank-tier glass" data-tier="ultra">ULTRA PRO</div>
+      </div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">XP growth</div><div class="sec-sub">cumulative</div></div>
+    <div class="chart-card glass">
+      <canvas id="xpChart"></canvas>
+      <div class="chart-legend"><span id="xpStart">–</span><span id="xpEnd">0 XP</span></div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Time split</div><div class="sec-sub">lifetime</div></div>
+    <div class="donut-card glass">
+      <canvas id="donutChart" width="120" height="120"></canvas>
+      <div class="donut-legend" id="donutLegend"></div>
+    </div>
+
+    <!-- ===== Week Report (Sat night — "Hafte Ka Vansh") ===== -->
+    <div class="sec-head" id="weekReportSection"><div class="sec-title">🗓️ Hafte Ka Report</div><div class="sec-sub">Sun – Sat</div></div>
+
+    <div class="vansh-crown-card glass" id="crownCard"></div>
+
+    <div class="stat-grid">
+      <div class="stat-card glass">
+        <div class="stat-ic">⚡</div>
+        <div class="stat-val" id="statWeekXp">0</div>
+        <div class="stat-label">Total XP this week</div>
+      </div>
+      <div class="stat-card glass">
+        <div class="stat-ic">⏱️</div>
+        <div class="stat-val" id="statWeekFocus">0m</div>
+        <div class="stat-label">Focus time this week</div>
+      </div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">XP per day</div></div>
+    <div class="chart-card glass"><canvas id="weekBarChart"></canvas></div>
+
+    <div class="sec-head"><div class="sec-title">Cumulative growth</div></div>
+    <div class="chart-card glass"><canvas id="weekCumChart"></canvas></div>
+
+    <div class="sec-head"><div class="sec-title">Time split</div><div class="sec-sub">this week</div></div>
+    <div class="donut-card glass">
+      <canvas id="weekDonut" width="120" height="120"></canvas>
+      <div class="donut-legend" id="weekDonutLegend"></div>
+    </div>
+
+    <div class="sec-head"><div class="sec-title">Day-by-day leaderboard</div></div>
+    <div class="best-sit-card glass"><div class="rank-list" id="rankList"></div></div>
+
+    <div class="install-hint">Numbers update every time you log work. Full week report locks in fresh every Saturday night.</div>
+  </section>
+
+  <!-- ======================================================= -->
+  <!-- VIEW: REWARDS                                            -->
+  <!-- ======================================================= -->
+  <section class="view" id="view-rewards" hidden>
+
+    <div class="sec-head" style="margin-top:0;">
+      <div class="sec-title">Achievements</div>
+      <div class="sec-sub" id="badgeCount">0/0</div>
+    </div>
+    <div class="badge-strip" id="badgeStrip"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">🧳 Streak trip rewards</div>
+      <div class="sec-sub">every 10-day streak</div>
+    </div>
+    <div id="tripRewards"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">🏆 Boss trophies</div>
+      <div class="sec-sub" id="bossTrophyCount">0 defeated</div>
+    </div>
+    <div id="bossTrophies"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">🎁 Chests opened</div>
+      <div class="sec-sub" id="chestCount">0 opened</div>
+    </div>
+    <div id="chestHistory"></div>
+
+    <div class="sec-head" id="treats">
+      <div class="sec-title">🍕 Level-up treats</div>
+      <div class="sec-sub">pick a reward per level</div>
+    </div>
+    <div id="foodRewards"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">🏨 Weekend hotel stays</div>
+      <div class="sec-sub">every level, next Saturday</div>
+    </div>
+    <div id="hotelRewards"></div>
+
+    <div class="sec-head">
+      <div class="sec-title">Level ladder</div>
+      <div class="sec-sub" id="ladderSub">next 10 levels</div>
+    </div>
+    <div class="level-ladder glass" style="border-radius:var(--radius-lg); padding:10px 10px;" id="levelLadder"></div>
+
+    <div class="install-hint">Har level pe naya treat, aur weekend pe hotel stay reward 🎉</div>
+  </section>
+
+</div>
+
+<div id="bottomNav"></div>
+<div id="toast"></div>
+<div id="confetti"></div>
+<div id="moodOverlay"></div>
+
+<script src="./app.js"></script>
+<script>
+/* ================= VIEW SWITCHING ================= */
+let currentView = "home";
+function switchView(name, scrollId){
+  document.querySelectorAll(".view").forEach(v=>{
+    const active = v.id === "view-"+name;
+    v.classList.toggle("active", active);
+    v.hidden = !active;
+  });
+  document.querySelectorAll("#bottomNav .nav-item").forEach(b=> b.classList.toggle("active", b.dataset.view===name));
+  currentView = name;
+  window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  if (scrollId){
+    setTimeout(()=>{ const el=document.getElementById(scrollId); if (el) el.scrollIntoView({behavior:"smooth", block:"start"}); }, 80);
+  }
+}
+document.querySelectorAll("[data-view]").forEach(el=>{
+  if (el.id === "liveSessionChip") return; // wired separately below
+  el.addEventListener("click", ()=> switchView(el.dataset.view, el.dataset.scroll));
+});
+document.getElementById("liveSessionChip").addEventListener("click", ()=> switchView("study"));
+
+/* ================= EKG CANVAS ================= */
+let ekgPhase = 0;
+let ekgStartTs = null;
+function drawEkg(ts){
+  if (ekgStartTs === null) ekgStartTs = ts || performance.now();
+  const canvas = document.getElementById("ekg");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 88;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const today = Math.round(scoreForDate(todayStr()));
+  const yesterday = Math.round(scoreForDate(yesterdayStr()));
+  const ahead = today >= yesterday;
+  const color = ahead ? "#00E5A8" : "#FF6B4A";
+
+  const baseline = h*0.62;
+  ctx.beginPath();
+  const n = 180;
+  const beatsOnScreen = 3;
+  for (let i=0;i<=n;i++){
+    const t = i/n;
+    const x = t*w;
+    let y = baseline;
+    const beatT = (t*beatsOnScreen + ekgPhase) % 1;
+    if (beatT > 0.42 && beatT < 0.5){
+      const local = (beatT-0.42)/0.08;
+      y = baseline - Math.sin(local*Math.PI) * h*0.16;
+    } else if (beatT >= 0.5 && beatT < 0.58){
+      const local = (beatT-0.5)/0.08;
+      y = baseline - (h*0.16) + local*(h*0.38);
+    } else if (beatT >= 0.58 && beatT < 0.66){
+      const local = (beatT-0.58)/0.08;
+      y = baseline + (h*0.22) - local*(h*0.22);
+    }
+    if (i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  const elapsed = (ts || performance.now()) - ekgStartTs;
+  const ramp = Math.min(1, elapsed / 1500);
+  const speed = 0.0016 * (0.35 + 0.65*ramp);
+  ekgPhase = (ekgPhase + speed) % 1;
+  requestAnimationFrame(drawEkg);
+}
+
+/* ================= HOME RENDER ================= */
+let lastRankTier = null;
+let firstRender = true;
+
+function renderHome(){
+  const today = todayStr();
+  document.getElementById("dateLabel").textContent = new Date().toLocaleDateString(undefined,{weekday:'short', month:'short', day:'numeric'});
+
+  const todayScore = Math.round(scoreForDate(today));
+  const yesterdayScore = Math.round(scoreForDate(yesterdayStr()));
+  document.getElementById("todayScore").textContent = todayScore;
+  document.getElementById("vsLabel").textContent = `vs ${yesterdayScore} yesterday`;
+
+  const statusEl = document.getElementById("pulseStatus");
+  if (todayScore > yesterdayScore){ statusEl.textContent = "Ahead"; statusEl.className = "pulse-status ahead"; }
+  else if (todayScore < yesterdayScore){ statusEl.textContent = "Behind"; statusEl.className = "pulse-status behind"; }
+  else { statusEl.textContent = "Even"; statusEl.className = "pulse-status even"; }
+
+  const streak = streakCount();
+  document.getElementById("streakLabel").textContent = `${streak}-day streak`;
+  const flame = document.getElementById("flameIc");
+  const flameSize = streak >= 14 ? "18px" : streak >= 7 ? "16px" : streak >= 3 ? "14px" : "12px";
+  flame.style.fontSize = flameSize;
+  flame.style.opacity = streak > 0 ? "1" : "0.35";
+
+  const phase = currentPhase();
+  const phaseNames = { video: "Video Phase", reading: "Reading Phase", mixed: "Mixed Phase" };
+  document.getElementById("progressLabel").textContent = phaseNames[phase];
+  renderPhaseBanner(phase);
+
+  const tier = rankTier(streak);
+  document.getElementById("rankLabel").textContent = RANK_LABEL[tier];
+  document.getElementById("rankDot").style.background = RANK_COLOR[tier];
+  if (!firstRender && lastRankTier && lastRankTier !== tier && (tier === "pro" || tier === "ultra")){
+    confettiBurst(36); vibrate([80,40,80,40,160]); playRankUp();
+    toast(`Rank up! You're now ${RANK_LABEL[tier]} 🎉`);
+  }
+  lastRankTier = tier;
+
+  const li = levelInfo();
+  document.getElementById("lvNum").textContent = li.level;
+  document.getElementById("lvTitle").textContent = levelTitle(li.level);
+  document.getElementById("lvXpText").textContent = `${Math.round(li.into)} / ${Math.round(li.span)} XP`;
+  document.getElementById("lvBarFill").style.width = li.pct + "%";
+
+  const remainingPhaseText = (()=>{
+    const key = phase === "video" ? "videoDone" : phase === "reading" ? "pagesDone" : null;
+    const totalKey = phase === "video" ? "videoTotal" : phase === "reading" ? "pagesTotal" : null;
+    if (!key) return "Start timer / log work";
+    const remaining = Object.entries(state.subjects).map(([name,s])=>({name,left:s[totalKey]-s[key]})).filter(r=>r.left>0).sort((a,b)=>a.left-b.left)[0];
+    return remaining ? `${remaining.name} needs more` : "All caught up";
+  })();
+  document.getElementById("quickStudySub").textContent = remainingPhaseText;
+
+  const { unlockedSet, newly: newlyBadges } = computeUnlockedBadges();
+  document.getElementById("quickBadgeSub").textContent = `${unlockedSet.size}/${BADGES.length} unlocked`;
+
+  const rep = buildWeekReport();
+  document.getElementById("quickReportSub").textContent = rep.hasAnyData ? `${rep.best.day} Vansh leading — ${rep.best.xp} XP` : "This week's Vansh";
+
+  renderQuestList();
+  renderBossCard();
+  renderChestCta();
+  renderTripCta();
+  renderReportCta();
+  renderDuelArena();
+  pushStatsToSW();
+
+  if (firstRender){
+    checkLevelRewards();
+    checkPersonalBests();
+    const bossReward = checkBossDefeatReward();
+    if (bossReward){
+      setTimeout(()=> showRevealOverlay("boss", `Boss defeated! 🏆`, `Reward unlocked: ${bossReward.icon} ${bossReward.name}`), 400);
+    }
+    const mood = runMoodCheckIfDue();
+    if (mood) setTimeout(()=> showMoodAnimation(mood), bossReward ? 3200 : 500);
+    if (newlyBadges.length){
+      const badgeStart = (bossReward ? 3200 : 0) + (mood ? 3200 : 500);
+      celebrateNewBadges(newlyBadges, badgeStart);
+    }
+  }
+  firstRender = false;
+}
+
+function renderBossCard(){
+  const status = bossStatus();
+  document.getElementById("bossName").textContent = `Week Boss #${status.bossNumber}`;
+  document.getElementById("bossHpText").textContent = `${Math.round(status.dmg)} / ${status.maxHp} dmg`;
+  document.getElementById("bossHpFill").style.width = (100 - status.pct) + "%";
+  const card = document.getElementById("bossCard");
+  const statusRow = document.getElementById("bossStatusRow");
+  const icEl = document.getElementById("bossIc");
+  const subEl = document.getElementById("bossSub");
+  if (status.defeated){
+    card.classList.add("defeated");
+    icEl.textContent = "🏆";
+    subEl.textContent = "Defeated this week — new boss spawns Sunday";
+    statusRow.innerHTML = `<div class="boss-status-chip">Boss defeated ✓</div>`;
+  } else {
+    card.classList.remove("defeated");
+    icEl.textContent = "👹";
+    subEl.textContent = "Log XP this week to deal damage";
+    statusRow.innerHTML = "";
+  }
+}
+
+/* ================= DUEL ARENA (session-based) ================= */
+function renderDuelArena(){
+  const hour = new Date().getHours();
+  const todayXpVal = Math.round(scoreForDate(todayStr()));
+  const yestXpVal = Math.round(xpUpToHour(yesterdayStr(), hour + 1));
+  document.getElementById("duelTodayXp").textContent = todayXpVal + " XP";
+  document.getElementById("duelYestXp").textContent = yestXpVal + " XP";
+  const total = Math.max(1, todayXpVal + yestXpVal);
+  const leftPct = Math.round((todayXpVal / total) * 100);
+  document.getElementById("duelFillLeft").style.width = leftPct + "%";
+  document.getElementById("duelFillRight").style.width = (100 - leftPct) + "%";
+
+  const sessionsToday = focusSessionsForDate(todayStr()).length;
+  const sessionsYest = focusSessionsForDate(yesterdayStr()).length;
+  document.getElementById("duelRound").textContent = `${sessionsToday} session${sessionsToday!==1?'s':''} aaj · ${sessionsYest} kal`;
+
+  const verdict = dayFinalVerdict(yesterdayStr(), daysAgoStr(2));
+  const yEl = document.getElementById("duelYesterdayResult");
+  yEl.textContent = verdict
+    ? `Kal ka final: ${verdict.ahead ? 'Vansh jeeta 🏆' : 'Vansh haara 😔'} (${verdict.closedXp} vs ${verdict.priorXp} XP)`
+    : "";
+}
+function pulseDuelCard(){
+  const duelCard = document.getElementById("duelCard");
+  duelCard.classList.remove("hit"); void duelCard.offsetWidth; duelCard.classList.add("hit");
+  renderDuelArena();
+}
+
+function renderTripCta(){
+  const milestone = nextUnclaimedTripMilestone();
+  const cta = document.getElementById("tripCta");
+  if (!milestone){ cta.style.display = "none"; return; }
+  cta.style.display = "flex";
+  document.getElementById("tripSub").textContent = `${milestone}-day streak reward — tap to claim`;
+  cta.onclick = ()=>{
+    grantTripReward(milestone);
+    cta.style.display = "none";
+    confettiBurst(50, ["#7C6CFF","#FFC857","#00E5A8","#FF6B4A"]);
+    vibrate([60,30,60,30,60,30,180]);
+    showRevealOverlay("trip", "4-5 Day Trip unlocked! 🧳", `${milestone}-day streak — har naya din purane ko beat kiya. Enjoy your trip!`);
+    setTimeout(renderHome, 2200);
+  };
+}
+function renderReportCta(){
+  const cta = document.getElementById("reportCta");
+  if (!isWeekReportReady()){ cta.style.display = "none"; return; }
+  cta.style.display = "flex";
+  const rep = buildWeekReport();
+  document.getElementById("reportCtaSub").textContent = rep.hasAnyData
+    ? `${rep.best.day} Vansh is leading with ${rep.best.xp} XP — see the full report`
+    : "Tap to see the week's Vansh";
+  cta.onclick = ()=> switchView("progress", "weekReportSection");
+}
+function renderChestCta(){
+  const milestone = nextUnclaimedChestMilestone();
+  const cta = document.getElementById("chestCta");
+  if (!milestone){ cta.style.display = "none"; return; }
+  cta.style.display = "flex";
+  document.getElementById("chestSub").textContent = `${milestone}-day streak reward — tap to open`;
+  cta.onclick = ()=>{
+    const reward = openChest(milestone);
+    cta.style.display = "none";
+    confettiBurst(30, ["#FFC857","#00E5A8","#7C6CFF"]);
+    vibrate([50,30,50,30,120]);
+    showRevealOverlay("chest", "Chest opened! 🎁", reward.label);
+    setTimeout(renderHome, 1800);
+  };
+}
+
+function renderPhaseBanner(phase){
+  const title = document.getElementById("phaseTitle");
+  const desc = document.getElementById("phaseDesc");
+  const icon = document.getElementById("phaseIcon");
+  if (phase === "video"){
+    title.textContent = "Video Phase";
+    desc.textContent = "First-watch every subject to unlock Reading";
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M5 3l14 9-14 9V3z" fill="#052A20"/></svg>';
+  } else if (phase === "reading"){
+    title.textContent = "Reading Phase";
+    desc.textContent = "Finish first read-through of every subject to unlock Mixed";
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 5c3 0 6 1 8 3 2-2 5-3 8-3v13c-3 0-6 1-8 3-2-2-5-3-8-3V5z" stroke="#052A20" stroke-width="2" stroke-linejoin="round"/></svg>';
+  } else {
+    title.textContent = "Mixed Phase";
+    desc.textContent = "Log any combination of video, reading and MCQs — no gating";
+    icon.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 12l4-8 4 16 4-12 4 4" stroke="#052A20" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  }
+}
+
+function renderQuestList(){
+  const { rows, anyNew } = computeQuestStatus();
+  document.getElementById("questList").innerHTML = rows.map(q=>`
+    <div class="quest-row ${q.done?'done':''}">
+      <div class="quest-check">✓</div>
+      <div class="quest-label">${escapeHtml(q.label)}</div>
+      <div class="quest-progress">${q.val}/${q.target}</div>
+    </div>`).join("");
+  if (!firstRender && anyNew){
+    toast("Quest complete ✓");
+    vibrate(60); tone(700, 0.08);
+  }
+}
+
+/* ================================================================= */
+/* STUDY VIEW — Padhai Clock (stopwatch) + log-on-stop + manual log   */
+/* ================================================================= */
+let pendingSession = null;   // session waiting for "what did you study" detail
+let studyMixedType = "video";
+let manualMixedType = "video";
+
+function fmtStopwatch(ms){
+  const totalSec = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(totalSec/3600);
+  const m = Math.floor((totalSec%3600)/60);
+  const s = totalSec%60;
+  const pad = n => String(n).padStart(2,"0");
+  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+}
+
+function renderStopwatch(){
+  const card = document.getElementById("stopwatchCard");
+  const running = isFocusRunning();
+  card.classList.toggle("running", running);
+  const btn = document.getElementById("swBtn");
+  const ic = document.getElementById("swIc");
+  const label = document.getElementById("swLabel");
+  const since = document.getElementById("swSince");
+  const chip = document.getElementById("liveSessionChip");
+
+  if (running){
+    const elapsed = Date.now() - state.focusActive.startTs;
+    document.getElementById("swDisplay").textContent = fmtStopwatch(elapsed);
+    since.textContent = `Shuru hua: ${formatClockTime(state.focusActive.startTs)}`;
+    btn.classList.add("stop");
+    ic.textContent = "■";
+    label.textContent = "Stop";
+    chip.style.display = "flex";
+    document.getElementById("liveSessionTime").textContent = fmtStopwatch(elapsed);
+  } else {
+    document.getElementById("swDisplay").textContent = "00:00:00";
+    since.textContent = "Baitho aur Start dabao";
+    btn.classList.remove("stop");
+    ic.textContent = "▶";
+    label.textContent = "Start";
+    chip.style.display = "none";
+  }
+}
+
+document.getElementById("swBtn").addEventListener("click", ()=>{
+  if (isFocusRunning()){
+    const result = stopFocusSession();
+    if (!result){
+      toast("1 minute se kam — count nahi hua");
+    } else {
+      vibrate(result.newBest ? [50,30,50,30,140] : 45);
+      if (result.newBest){
+        confettiBurst(36, ["#00E5A8","#FFC857"]);
+        playRankUp();
+        showRevealOverlay("up", "Naya personal best sitting! 🏆", `${fmtMin(result.durationMin)} lagatar padha — ab tak ka best session!`, "⏱️");
+      } else {
+        playSave();
+      }
+      pendingSession = result;
+      studyMixedType = "video";
+      renderLogDetailCard();
+    }
+  } else {
+    startFocusSession();
+    playComboTick(1.2);
+    vibrate(40);
+    toast("Clock chalu — ab lagatar padho!");
+  }
+  renderStopwatch();
+  renderBestSit();
+  renderSessionList();
+  renderSessionTrendChart();
+  renderSitChart();
+  pulseDuelCard();
+});
+
+/* ---- Log-detail card (shown right after Stop) ---- */
+function subjectOptionsHtml(){
+  return SUBJECT_TABLE.map(([name]) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+}
+function renderLogDetailCard(){
+  const card = document.getElementById("logDetailCard");
+  if (!pendingSession){ card.style.display = "none"; card.innerHTML = ""; return; }
+  card.style.display = "block";
+  const durationLabel = fmtMin(pendingSession.durationMin);
+  const rangeLabel = `${formatClockTime(pendingSession.startTs)} – ${formatClockTime(pendingSession.endTs)}`;
+  const label = studyMixedType==='video' ? 'Minutes watched' : studyMixedType==='reading' ? 'Pages read' : 'MCQs solved';
+  const unit = studyMixedType==='video' ? 'min' : studyMixedType==='reading' ? 'pages' : 'MCQs';
+  const defaultAmount = studyMixedType==='video' ? pendingSession.durationMin : '';
+
+  card.innerHTML = `
+    <div class="logdetail-head">⏱️ Session: ${durationLabel}</div>
+    <div class="logdetail-sub">${rangeLabel} — kya padha, likh do:</div>
+    <div class="type-toggle" id="ldTypeToggle">
+      <button type="button" data-type="video" class="${studyMixedType==='video'?'active':''}">Video</button>
+      <button type="button" data-type="reading" class="${studyMixedType==='reading'?'active':''}">Reading</button>
+      <button type="button" data-type="mcq" class="${studyMixedType==='mcq'?'active':''}">MCQs</button>
+    </div>
+    <div class="field" style="margin-top:12px;">
+      <label>Subject</label>
+      <select id="ld_subject">${subjectOptionsHtml()}</select>
+    </div>
+    <div class="field">
+      <label>${label}</label>
+      <div class="amount-row">
+        <input type="number" id="ld_amount" min="1" placeholder="e.g. 45" value="${defaultAmount}" />
+        <div class="unit-pill">${unit}</div>
+      </div>
+    </div>
+    <div class="logdetail-actions">
+      <button type="button" class="save-btn" id="ld_save">Log & Save</button>
+      <button type="button" class="skip-btn" id="ld_skip">Skip</button>
+    </div>
+  `;
+  card.querySelectorAll("#ldTypeToggle button").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ studyMixedType = btn.dataset.type; renderLogDetailCard(); });
+  });
+  document.getElementById("ld_save").addEventListener("click", handleLogDetailSave);
+  document.getElementById("ld_skip").addEventListener("click", handleLogDetailSkip);
+}
+
+function handleLogDetailSave(){
+  const subject = document.getElementById("ld_subject").value;
+  const amount = parseFloat(document.getElementById("ld_amount").value);
+  if (!amount || amount <= 0){ toast("Amount enter karo"); return; }
+
+  const levelBefore = levelInfo().level;
+  const result = logStudySession(pendingSession, { type: studyMixedType, subject, amount });
+  if (!result) return;
+
+  const rewardResult = checkLevelRewards();
+  const leveledUp = levelInfo().level > levelBefore;
+  const bossReward = checkBossDefeatReward();
+  const dailyRecord = checkDailyRecordReward();
+
+  vibrate(result.justCompleted ? [60,30,60,30,160] : 40);
+  if (leveledUp && rewardResult.foods.length){
+    const f = rewardResult.foods[rewardResult.foods.length-1];
+    confettiBurst(40); playRankUp();
+    toast(`Level up! Reward unlocked: ${f.icon} ${f.name}`);
+  } else if (bossReward){
+    confettiBurst(40, ["#00E5A8","#FFC857"]); playBossDefeatTune();
+    toast(`Boss defeated! Reward: ${bossReward.icon} ${bossReward.name}`);
+  } else if (dailyRecord){
+    showRevealOverlay("record", "New Daily Record! 🏆", `${dailyRecord.todayScore} XP aaj — purana best tha ${dailyRecord.prevBest} XP`, "🏆");
+    confettiBurst(40, ["#FFC857","#7C6CFF","#00E5A8"]);
+  } else if (result.justCompleted){
+    playMilestone(); confettiBurst(20); toast(`${subject} complete! 🔥`);
+  } else if (result.usedToken){
+    tone(880,0.1); tone(1108,0.12,"triangle",0.08);
+    toast(`Double-XP token used — 2x XP this log ✓`);
+  } else if (result.comboMult > 1){
+    playComboTick(result.comboMult);
+    toast(`Combo x${result.comboN}! ${result.comboMult}x XP ✓`);
+  } else {
+    playSave(); toast("Logged ✓");
+  }
+
+  pendingSession = null;
+  renderLogDetailCard();
+  refreshStudyView();
+  renderHome();
+  pulseDuelCard();
+}
+function handleLogDetailSkip(){
+  logStudySessionAsPlainFocus(pendingSession);
+  toast(`Session save ho gaya — ${fmtMin(pendingSession.durationMin)} focus time ✓`);
+  vibrate(35);
+  pendingSession = null;
+  renderLogDetailCard();
+  refreshStudyView();
+  renderHome();
+  pulseDuelCard();
+}
+
+/* ---- Best sitting: today vs yesterday ---- */
+function bestSitColHtml(tag, data, win){
+  if (!data) return `<div class="best-sit-col ${win?'win':''}"><div class="best-sit-tag">${tag}</div><div class="best-sit-empty">Koi session nahi</div></div>`;
+  return `
+    <div class="best-sit-col ${win?'win':''}">
+      <div class="best-sit-tag">${tag}</div>
+      <div class="best-sit-dur">${fmtMin(data.durationMin)}</div>
+      <div class="best-sit-range">${data.label}</div>
+    </div>`;
+}
+function renderBestSit(){
+  const cmp = bestSittingComparison();
+  const row = document.getElementById("bestSitRow");
+  const verdict = document.getElementById("bestSitVerdict");
+  if (!cmp){
+    row.innerHTML = bestSitColHtml("Aaj", null, false) + bestSitColHtml("Kal", null, false);
+    verdict.textContent = "Ek session complete karo to yahan comparison dikhega.";
+    return;
+  }
+  row.innerHTML = bestSitColHtml("Aaj", cmp.today, cmp.ahead) + bestSitColHtml("Kal", cmp.yest, !cmp.ahead && !!cmp.yest);
+  if (cmp.today && cmp.yest){
+    verdict.textContent = cmp.ahead
+      ? `Aaj ka best sitting (${cmp.today.label}) kal se lamba raha — is sitting hour ne jeeta! 🚀`
+      : `Kal ka best sitting (${cmp.yest.label}) abhi bhi aage hai — aaj ek lambi sitting lagao!`;
+  } else if (cmp.today){
+    verdict.textContent = "Kal koi session nahi tha — aaj wala hi record hai abhi.";
+  } else {
+    verdict.textContent = "Aaj abhi tak koi session nahi — clock start karo!";
+  }
+}
+
+/* ---- Today's sessions list (with vs-previous-sitting delta badges) ---- */
+function renderSessionList(){
+  const trend = sessionTrendForDate(todayStr());
+  document.getElementById("todayFocusTotal").textContent = `${fmtMin(focusMinutesForDate(todayStr()))} total`;
+  const host = document.getElementById("sessionList");
+  if (!trend.length){
+    host.innerHTML = `<div class="best-sit-empty">Abhi tak koi session log nahi hua.</div>`;
+    return;
+  }
+  host.innerHTML = trend.slice().reverse().map(s=>{
+    let deltaHtml = "";
+    if (s.delta !== null){
+      const up = s.delta >= 0;
+      deltaHtml = `<span class="sc-delta ${up?'up':'down'}">${up?'▲':'▼'} ${fmtMin(Math.abs(s.delta))} vs pichla</span>`;
+    }
+    return `
+    <div class="session-chip">
+      <span class="sc-range">#${s.index} · ${formatClockTime(s.startTs)} – ${formatClockTime(s.endTs)}${deltaHtml}</span>
+      <span class="sc-dur">${fmtMin(s.durationMin)}</span>
+    </div>`;
+  }).join("");
+}
+
+/* ---- Session-by-session trend: aaj ka cumulative sitting time vs kal ---- */
+function renderSessionTrendChart(){
+  const canvas = document.getElementById("sessionTrendChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 120;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const todayCum = cumulativeSessionSeries(todayStr());
+  const yestCum = cumulativeSessionSeries(yesterdayStr());
+  const n = Math.max(todayCum.length, yestCum.length, 1);
+  // hold the last known value flat past the end of a shorter series, so both
+  // lines are comparable at every session checkpoint on the x-axis
+  const extend = (arr) => { const out=[]; let last=0; for (let i=0;i<n;i++){ if (i<arr.length) last=arr[i]; out.push(last);} return out; };
+  const todaySeries = extend(todayCum);
+  const yestSeries = extend(yestCum);
+  const max = Math.max(10, ...todaySeries, ...yestSeries);
+  const padTop = 10, padBottom = 18;
+  const stepX = n > 1 ? w/(n-1) : w;
+
+  const toPts = (series) => series.map((v,i)=> ({ x: i*stepX, y: h - padBottom - (v/max)*(h-padTop-padBottom) }));
+  const drawLine = (series, color) => {
+    const pts = toPts(series);
+    ctx.beginPath();
+    pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2.5;
+    ctx.lineJoin = "round";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 7;
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    pts.forEach(p=>{
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 2.6, 0, Math.PI*2);
+      ctx.fillStyle = color;
+      ctx.fill();
+    });
+  };
+
+  if (n > 0 && yestCum.length){
+    drawLine(yestSeries, "#FF6B4A");
+  }
+  if (n > 0 && todayCum.length){
+    drawLine(todaySeries, "#00E5A8");
+  }
+  if (!todayCum.length && !yestCum.length){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+  }
+
+  ctx.fillStyle = "#5E6A82";
+  ctx.font = "600 9px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center";
+  for (let i=0;i<n;i++) ctx.fillText("#"+(i+1), i*stepX, h-4);
+
+  const verdictEl = document.getElementById("sessionTrendVerdict");
+  const trend = todaySittingTrend();
+  if (!trend || trend.count < 2){
+    verdictEl.textContent = "Kam se kam 2 sessions complete karo — tabhi trend dikhega.";
+  } else {
+    const dirText = trend.netTrend === "increasing"
+      ? `har agla sitting pichle se average ${fmtMin(Math.abs(trend.avgDelta))} zyada raha — trend Increasing 📈`
+      : trend.netTrend === "decreasing"
+      ? `har agla sitting pichle se average ${fmtMin(Math.abs(trend.avgDelta))} kam raha — trend Decreasing 📉`
+      : `sittings roughly barabar rahi — trend Flat ➡️`;
+    verdictEl.textContent = `Aaj: ${dirText}`;
+  }
+}
+
+/* ---- 7-day best-sitting bar chart ---- */
+function roundRectStudy(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function renderSitChart(){
+  const canvas = document.getElementById("sitChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 100;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = 7;
+  const vals = [];
+  for (let i=days-1;i>=0;i--){
+    const best = bestSessionForDate(daysAgoStr(i));
+    vals.push(best ? best.durationMin : 0);
+  }
+  const max = Math.max(10, ...vals);
+  const padTop = 10, padBottom = 16;
+  const barW = w/days;
+
+  vals.forEach((v,i)=>{
+    const bh = (v/max) * (h-padTop-padBottom);
+    const x = i*barW + barW*0.22;
+    const y = h - padBottom - bh;
+    const isToday = i === days-1;
+    const grad = ctx.createLinearGradient(0,y,0,h-padBottom);
+    if (isToday){ grad.addColorStop(0,"#00E5A8"); grad.addColorStop(1,"#00E5A855"); }
+    else { grad.addColorStop(0,"#7C6CFF"); grad.addColorStop(1,"#7C6CFF33"); }
+    ctx.fillStyle = grad;
+    roundRectStudy(ctx, x, y, barW*0.56, Math.max(2,bh), 3);
+    ctx.fill();
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 8px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    const d = new Date(daysAgoStr(days-1-i));
+    ctx.fillText(d.toLocaleDateString(undefined,{weekday:'narrow'}), x + barW*0.28, h-4);
+  });
+
+  document.getElementById("sitStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+
+/* ---- Manual log form (video/reading/mcq, gated by phase) ---- */
+function renderComboStrip(){
+  const strip = document.getElementById("comboStrip");
+  const n = comboCountTodayBeforeNewEntry();
+  const chips = [];
+  if (n > 0){
+    const mult = comboMultiplierForN(n+1);
+    if (mult > 1) chips.push(`<span class="combo-chip combo">🔥 Combo x${n+1} — ${mult}x XP on next log</span>`);
+    else chips.push(`<span class="combo-chip combo">${n} logged today</span>`);
+  }
+  const tokens = ensurePowerups().doubleXp;
+  if (tokens > 0) chips.push(`<span class="combo-chip power">⚡ ${tokens} Double-XP token${tokens>1?'s':''} ready</span>`);
+  strip.innerHTML = chips.join("");
+}
+
+function renderLogForm(phase){
+  const card = document.getElementById("logCard");
+  if (phase === "video"){
+    card.innerHTML = `
+      <div class="field">
+        <label>Subject</label>
+        <select id="f_subject">${subjectOptionsHtml()}</select>
+      </div>
+      <div class="field">
+        <label>Minutes watched</label>
+        <div class="amount-row">
+          <input type="number" id="f_amount" min="1" placeholder="e.g. 45" />
+          <div class="unit-pill">min</div>
+        </div>
+      </div>
+      <button type="button" class="save-btn" id="f_save">Log video</button>
+    `;
+  } else if (phase === "reading"){
+    card.innerHTML = `
+      <div class="field">
+        <label>Subject</label>
+        <select id="f_subject">${subjectOptionsHtml()}</select>
+      </div>
+      <div class="field">
+        <label>Pages read</label>
+        <div class="amount-row">
+          <input type="number" id="f_amount" min="1" placeholder="e.g. 5" />
+          <div class="unit-pill">pages</div>
+        </div>
+      </div>
+      <button type="button" class="save-btn" id="f_save">Log reading</button>
+    `;
+  } else {
+    card.innerHTML = `
+      <div class="field">
+        <label>Type</label>
+        <div class="type-toggle">
+          <button type="button" data-type="video" class="${manualMixedType==='video'?'active':''}">Video</button>
+          <button type="button" data-type="reading" class="${manualMixedType==='reading'?'active':''}">Reading</button>
+          <button type="button" data-type="mcq" class="${manualMixedType==='mcq'?'active':''}">MCQs</button>
+        </div>
+      </div>
+      <div class="field" id="f_subject_field">
+        <label>Subject</label>
+        <select id="f_subject">${subjectOptionsHtml()}</select>
+      </div>
+      <div class="field">
+        <label id="f_amount_label">Minutes watched</label>
+        <div class="amount-row">
+          <input type="number" id="f_amount" min="1" placeholder="e.g. 45" />
+          <div class="unit-pill" id="f_unit">min</div>
+        </div>
+      </div>
+      <button type="button" class="save-btn" id="f_save">Log entry</button>
+    `;
+    card.querySelectorAll(".type-toggle button").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        manualMixedType = btn.dataset.type;
+        renderLogForm("mixed");
+      });
+    });
+    const label = document.getElementById("f_amount_label");
+    const unit = document.getElementById("f_unit");
+    const subjField = document.getElementById("f_subject_field");
+    if (manualMixedType === "video"){ label.textContent="Minutes watched"; unit.textContent="min"; subjField.style.display=""; }
+    if (manualMixedType === "reading"){ label.textContent="Pages read"; unit.textContent="pages"; subjField.style.display=""; }
+    if (manualMixedType === "mcq"){ label.textContent="MCQs solved"; unit.textContent="MCQs"; subjField.style.display=""; }
+  }
+
+  document.getElementById("f_save").addEventListener("click", ()=> handleManualSave(phase));
+}
+
+function handleManualSave(phase){
+  const subjectSel = document.getElementById("f_subject");
+  const amountInput = document.getElementById("f_amount");
+  const subject = subjectSel ? subjectSel.value : null;
+  const amount = parseFloat(amountInput.value);
+
+  if (!amount || amount <= 0){
+    toast("Enter an amount first");
+    return;
+  }
+
+  const levelBefore = levelInfo().level;
+  const type = phase === "mixed" ? manualMixedType : (phase === "video" ? "video" : "reading");
+
+  const comboN = comboCountTodayBeforeNewEntry() + 1;
+  const comboMult = comboMultiplierForN(comboN);
+  const usedToken = consumeDoubleXpIfAvailable();
+  const xpMult = comboMult * (usedToken ? 2 : 1);
+
+  const entry = { id: Date.now()+"-"+Math.random().toString(36).slice(2,7), date: todayStr(), subject, phase, type, amount, xpMult, ts: Date.now() };
+  state.logs.push(entry);
+
+  let justCompleted = false;
+  if (subject && (type === "video" || type === "reading")){
+    const s = state.subjects[subject];
+    if (type === "video"){
+      const wasComplete = s.videoDone >= s.videoTotal;
+      s.videoDone = Math.min(s.videoTotal, s.videoDone + amount);
+      if (!wasComplete && s.videoDone >= s.videoTotal) justCompleted = true;
+    } else {
+      const wasComplete = s.pagesDone >= s.pagesTotal;
+      s.pagesDone = Math.min(s.pagesTotal, s.pagesDone + amount);
+      if (!wasComplete && s.pagesDone >= s.pagesTotal) justCompleted = true;
+    }
+  }
+
+  saveState(state);
+  amountInput.value = "";
+
+  const rewardResult = checkLevelRewards();
+  const leveledUp = levelInfo().level > levelBefore;
+  const bossReward = checkBossDefeatReward();
+  const dailyRecord = checkDailyRecordReward();
+
+  vibrate(justCompleted ? [60,30,60,30,160] : 40);
+  if (leveledUp && rewardResult.foods.length){
+    const f = rewardResult.foods[rewardResult.foods.length-1];
+    confettiBurst(40); playRankUp();
+    toast(`Level up! Reward unlocked: ${f.icon} ${f.name}`);
+  } else if (bossReward){
+    confettiBurst(40, ["#00E5A8","#FFC857"]); playBossDefeatTune();
+    toast(`Boss defeated! Reward: ${bossReward.icon} ${bossReward.name}`);
+  } else if (dailyRecord){
+    showRevealOverlay("record", "New Daily Record! 🏆", `${dailyRecord.todayScore} XP aaj — purana best tha ${dailyRecord.prevBest} XP`, "🏆");
+    confettiBurst(40, ["#FFC857","#7C6CFF","#00E5A8"]);
+  } else if (justCompleted){
+    playMilestone(); confettiBurst(20); toast(`${subject} complete! 🔥`);
+  } else if (usedToken){
+    tone(880,0.1); tone(1108,0.12,"triangle",0.08);
+    toast(`Double-XP token used — 2x XP this log ✓`);
+  } else if (comboMult > 1){
+    playComboTick(comboMult);
+    toast(`Combo x${comboN}! ${comboMult}x XP ✓`);
+  } else {
+    playSave(); toast("Logged ✓");
+  }
+
+  const btn = document.getElementById("f_save");
+  btn.classList.remove("success"); void btn.offsetWidth; btn.classList.add("success");
+
+  const phaseNow = currentPhase();
+  renderPhaseBanner(phaseNow);
+  if (phaseNow !== phase){ renderLogForm(phaseNow); }
+  renderSubjectGrid();
+  renderComboStrip();
+  renderHome();
+  pulseDuelCard();
+
+  if (justCompleted){
+    const card = document.querySelector(`.subj-card[data-name="${cssEscape(subject)}"]`);
+    if (card){ card.classList.remove("saved-pop"); void card.offsetWidth; card.classList.add("saved-pop"); }
+  }
+}
+
+/* ---- Subject grid ---- */
+let activeSubjTab = "video";
+document.getElementById("subjTabs").addEventListener("click", (e)=>{
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  activeSubjTab = btn.dataset.tab;
+  document.querySelectorAll("#subjTabs button").forEach(b=>b.classList.toggle("active", b===btn));
+  renderSubjectGrid();
+});
+
+function renderSubjectGrid(){
+  const grid = document.getElementById("subjectGrid");
+  const kind = activeSubjTab;
+  grid.innerHTML = SUBJECT_TABLE.map(([name])=>{
+    const s = state.subjects[name];
+    const total = kind === "video" ? s.videoTotal : s.pagesTotal;
+    const done = kind === "video" ? s.videoDone : s.pagesDone;
+    const pct = Math.min(100, Math.round((done/total)*100));
+    const complete = pct >= 100;
+    const metaText = kind === "video"
+      ? `${fmtMin(done)} / ${fmtMin(total)}`
+      : `${Math.round(done)} / ${total} pages`;
+    return `
+      <div class="subj-card glass ${complete?'complete':''}" data-name="${escapeHtml(name)}">
+        ${complete ? '<div class="check-badge"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#052A20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' : ''}
+        <div class="subj-name">${escapeHtml(name)}</div>
+        <div class="subj-ring-row">
+          ${ringSvg(pct, complete)}
+          <div>
+            <div class="subj-pct">${pct}%</div>
+          </div>
+        </div>
+        <div class="subj-meta">${metaText}</div>
+      </div>
+    `;
+  }).join("");
+}
+function ringSvg(pct, complete){
+  const r = 16, c = 2*Math.PI*r;
+  const off = c - (c*pct/100);
+  const color = complete ? "#00E5A8" : (pct>0 ? "#7C6CFF" : "#2A3348");
+  return `<svg width="40" height="40" viewBox="0 0 40 40">
+    <circle cx="20" cy="20" r="${r}" fill="none" stroke="#1E2740" stroke-width="4"/>
+    <circle cx="20" cy="20" r="${r}" fill="none" stroke="${color}" stroke-width="4" stroke-linecap="round"
+      stroke-dasharray="${c}" stroke-dashoffset="${off}" transform="rotate(-90 20 20)"/>
+  </svg>`;
+}
+
+function refreshStudyView(){
+  renderStopwatch();
+  renderBestSit();
+  renderSessionList();
+  renderSessionTrendChart();
+  renderSitChart();
+  const phaseNow = currentPhase();
+  renderLogForm(phaseNow);
+  renderSubjectGrid();
+  renderComboStrip();
+}
+
+/* ================================================================= */
+/* PROGRESS VIEW                                                      */
+/* ================================================================= */
+function renderHeatmap(){
+  const wrap = document.getElementById("heatmapGrid");
+  const days = 70;
+  const rows = [];
+  for (let i = days-1; i>=0; i--) rows.push({ date: daysAgoStr(i), score: scoreForDate(daysAgoStr(i)) });
+  const max = Math.max(1, ...rows.map(r=>r.score));
+  wrap.innerHTML = rows.map(r=>{
+    const lvl = r.score <= 0 ? 0 : Math.min(4, Math.ceil((r.score/max)*4));
+    return `<div class="heat-cell ${lvl?'lvl'+lvl:''}" title="${r.date}: ${Math.round(r.score)} pts"></div>`;
+  }).join("");
+}
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+function renderTrendChart(){
+  const canvas = document.getElementById("trendChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = 14;
+  const scores = [];
+  for (let i = days-1; i>=0; i--) scores.push(scoreForDate(daysAgoStr(i)));
+  const max = Math.max(10, ...scores);
+  const padTop = 10, padBottom = 6;
+  const barW = w/days;
+
+  scores.forEach((sc, i)=>{
+    const bh = ((sc/max) * (h-padTop-padBottom));
+    const x = i*barW + barW*0.22;
+    const y = h - padBottom - bh;
+    const isToday = i === days-1;
+    const grad = ctx.createLinearGradient(0,y,0,h-padBottom);
+    if (isToday){ grad.addColorStop(0,"#00E5A8"); grad.addColorStop(1,"#00E5A855"); }
+    else { grad.addColorStop(0,"#7C6CFF"); grad.addColorStop(1,"#7C6CFF33"); }
+    ctx.fillStyle = grad;
+    roundRect(ctx, x, y, barW*0.56, Math.max(2,bh), 3);
+    ctx.fill();
+  });
+
+  document.getElementById("trendStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+}
+function renderXpChart(){
+  const canvas = document.getElementById("xpChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const days = 14;
+  const vals = [];
+  for (let i = days-1; i>=0; i--) vals.push(cumulativeXPuntil(daysAgoStr(i)));
+  const max = Math.max(10, ...vals);
+  const padTop = 10, padBottom = 6;
+  const stepX = w/(days-1);
+
+  const pts = vals.map((v,i)=> ({ x: i*stepX, y: h - padBottom - (v/max)*(h-padTop-padBottom) }));
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, h-padBottom);
+  pts.forEach(p=> ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, h-padBottom);
+  ctx.closePath();
+  const fillGrad = ctx.createLinearGradient(0,0,0,h);
+  fillGrad.addColorStop(0, "rgba(0,229,168,0.35)");
+  fillGrad.addColorStop(1, "rgba(0,229,168,0.02)");
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = "#00E5A8";
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.shadowColor = "#00E5A8";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  document.getElementById("xpStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+  document.getElementById("xpEnd").textContent = `${Math.round(vals[vals.length-1])} XP`;
+}
+function renderDonut(){
+  const canvas = document.getElementById("donutChart");
+  const dpr = window.devicePixelRatio || 1;
+  const size = 120;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,size,size);
+
+  const videoXP = state.logs.filter(l=>l.type==="video").reduce((a,l)=>a+l.amount*W_VIDEO,0);
+  const readingXP = state.logs.filter(l=>l.type==="reading").reduce((a,l)=>a+l.amount*W_PAGE,0);
+  const mcqXP = state.logs.filter(l=>l.type==="mcq").reduce((a,l)=>a+l.amount*W_MCQ,0);
+  const focusXP = state.logs.filter(l=>l.type==="focus").reduce((a,l)=>a+l.amount*W_FOCUS,0);
+  const total = videoXP + readingXP + mcqXP + focusXP;
+
+  const segments = [
+    { label: "Video", val: videoXP, color: "#7C6CFF" },
+    { label: "Reading", val: readingXP, color: "#00E5A8" },
+    { label: "MCQs", val: mcqXP, color: "#FFC857" },
+    { label: "Focus timer", val: focusXP, color: "#FF6B4A" },
+  ];
+
+  const cx = size/2, cy = size/2, rOuter = 52, rInner = 34;
+  if (total <= 0){
+    ctx.beginPath();
+    ctx.arc(cx,cy,rOuter,0,Math.PI*2);
+    ctx.strokeStyle = "#1E2740"; ctx.lineWidth = rOuter-rInner; ctx.stroke();
+  } else {
+    let start = -Math.PI/2;
+    segments.forEach(seg=>{
+      if (seg.val <= 0) return;
+      const angle = (seg.val/total) * Math.PI*2;
+      ctx.beginPath();
+      ctx.arc(cx,cy,(rOuter+rInner)/2, start, start+angle);
+      ctx.strokeStyle = seg.color;
+      ctx.lineWidth = rOuter-rInner;
+      ctx.lineCap = "butt";
+      ctx.stroke();
+      start += angle;
+    });
+  }
+  ctx.fillStyle = "#EDF2F7";
+  ctx.font = "700 15px 'Space Grotesk', sans-serif";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText(Math.round(total), cx, cy-4);
+  ctx.fillStyle = "#5E6A82";
+  ctx.font = "600 8px 'JetBrains Mono', monospace";
+  ctx.fillText("XP", cx, cy+11);
+
+  const legend = document.getElementById("donutLegend");
+  legend.innerHTML = segments.filter(s=>s.val>0).map(seg=>{
+    const pct = total>0 ? Math.round((seg.val/total)*100) : 0;
+    return `<div class="legend-row"><span class="legend-dot" style="background:${seg.color}"></span>${seg.label}<span class="legend-val">${pct}%</span></div>`;
+  }).join("");
+}
+function highlightRankTier(){
+  const tier = rankTier(streakCount());
+  document.querySelectorAll(".rank-tier").forEach(el=>{
+    el.classList.toggle("current", el.dataset.tier === tier);
+  });
+}
+function renderPersonalBests(){
+  document.getElementById("statBestDay").textContent = Math.round(bestDayScoreEver());
+  document.getElementById("statBestStreak").textContent = checkPersonalBests();
+}
+
+/* ---- Week report (merged) ---- */
+function renderWeekReport(){
+  const report = buildWeekReport();
+
+  const crownCard = document.getElementById("crownCard");
+  if (!report.hasAnyData){
+    crownCard.innerHTML = `
+      <div class="vansh-crown-emoji">🌱</div>
+      <div class="vansh-crown-day">Abhi tak koi data nahi</div>
+      <div class="vansh-crown-sub">Is hafte kuch log karo — Saturday raat ko yahan "Vansh of the Week" crown hoga.</div>
+    `;
+  } else {
+    crownCard.innerHTML = `
+      <div class="vansh-crown-emoji">👑</div>
+      <div class="vansh-crown-day">${escapeHtml(report.best.day)} Vansh</div>
+      <div class="vansh-crown-sub">Is hafte ka sabse dum wala din — sabko peeche chhod diya!</div>
+      <div class="vansh-crown-xp">${report.best.xp} XP · ${fmtMin(report.best.focusMin)} focus time</div>
+    `;
+  }
+
+  document.getElementById("statWeekXp").textContent = report.totalXp;
+  document.getElementById("statWeekFocus").textContent = fmtMin(report.totalFocusMin);
+
+  renderWeekBar(report);
+  renderWeekCum(report);
+  renderWeekDonut(report);
+  renderRankList(report);
+}
+function renderWeekBar(report){
+  const canvas = document.getElementById("weekBarChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 130;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const vals = report.perDay.map(d=>d.xp);
+  const max = Math.max(10, ...vals);
+  const padTop = 12, padBottom = 20;
+  const n = vals.length;
+  const groupW = w/n;
+  const barW = groupW*0.5;
+  const bestIdx = report.perDay.findIndex(d=> d.date === report.best.date);
+
+  vals.forEach((v,i)=>{
+    const bh = (v/max) * (h-padTop-padBottom);
+    const x = i*groupW + (groupW-barW)/2;
+    const y = h - padBottom - bh;
+    const isBest = i === bestIdx && v > 0;
+    const grad = ctx.createLinearGradient(0,y,0,h-padBottom);
+    if (isBest){ grad.addColorStop(0,"#FFC857"); grad.addColorStop(1,"#FFC85755"); }
+    else { grad.addColorStop(0,"#00E5A8"); grad.addColorStop(1,"#00E5A855"); }
+    ctx.fillStyle = grad;
+    roundRect(ctx, x, y, barW, Math.max(2,bh), 4);
+    ctx.fill();
+    if (isBest){
+      ctx.font = "600 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("👑", x + barW/2, y-6);
+    }
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(report.perDay[i].day, x + barW/2, h-6);
+  });
+}
+function renderWeekCum(report){
+  const canvas = document.getElementById("weekCumChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const vals = report.cumulative;
+  const max = Math.max(10, ...vals);
+  const padTop = 10, padBottom = 16;
+  const n = vals.length;
+  const stepX = n > 1 ? w/(n-1) : w;
+  const pts = vals.map((v,i)=> ({ x: i*stepX, y: h - padBottom - (v/max)*(h-padTop-padBottom) }));
+
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, h-padBottom);
+  pts.forEach(p=> ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, h-padBottom);
+  ctx.closePath();
+  const fillGrad = ctx.createLinearGradient(0,0,0,h);
+  fillGrad.addColorStop(0, "rgba(124,108,255,0.35)");
+  fillGrad.addColorStop(1, "rgba(124,108,255,0.02)");
+  ctx.fillStyle = fillGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  ctx.strokeStyle = "#7C6CFF";
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.shadowColor = "#7C6CFF";
+  ctx.shadowBlur = 8;
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = "#5E6A82";
+  ctx.font = "600 9px 'JetBrains Mono', monospace";
+  ctx.textAlign = "center";
+  report.perDay.forEach((d,i)=> ctx.fillText(d.day, pts[i].x, h-4));
+}
+function renderWeekDonut(report){
+  const canvas = document.getElementById("weekDonut");
+  const dpr = window.devicePixelRatio || 1;
+  const size = 120;
+  canvas.width = size*dpr; canvas.height = size*dpr;
+  canvas.style.width = size+"px"; canvas.style.height = size+"px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,size,size);
+
+  const s = report.split;
+  const total = s.video + s.reading + s.mcq + s.focus + s.bonus;
+  const segments = [
+    { label:"Video", val:s.video, color:"#7C6CFF" },
+    { label:"Reading", val:s.reading, color:"#00E5A8" },
+    { label:"MCQs", val:s.mcq, color:"#FFC857" },
+    { label:"Focus timer", val:s.focus, color:"#FF6B4A" },
+    { label:"Bonus", val:s.bonus, color:"#5E6A82" },
+  ];
+
+  const cx=size/2, cy=size/2, rOuter=52, rInner=34;
+  if (total<=0){
+    ctx.beginPath(); ctx.arc(cx,cy,rOuter,0,Math.PI*2);
+    ctx.strokeStyle="#1E2740"; ctx.lineWidth=rOuter-rInner; ctx.stroke();
+  } else {
+    let start=-Math.PI/2;
+    segments.forEach(seg=>{
+      if (seg.val<=0) return;
+      const angle=(seg.val/total)*Math.PI*2;
+      ctx.beginPath();
+      ctx.arc(cx,cy,(rOuter+rInner)/2,start,start+angle);
+      ctx.strokeStyle=seg.color; ctx.lineWidth=rOuter-rInner; ctx.lineCap="butt"; ctx.stroke();
+      start+=angle;
+    });
+  }
+  ctx.fillStyle="#EDF2F7";
+  ctx.font="700 15px 'Space Grotesk', sans-serif";
+  ctx.textAlign="center"; ctx.textBaseline="middle";
+  ctx.fillText(Math.round(total), cx, cy-4);
+  ctx.fillStyle="#5E6A82";
+  ctx.font="600 8px 'JetBrains Mono', monospace";
+  ctx.fillText("XP", cx, cy+11);
+
+  const legend = document.getElementById("weekDonutLegend");
+  legend.innerHTML = segments.filter(s=>s.val>0).map(seg=>{
+    const pct = total>0 ? Math.round((seg.val/total)*100) : 0;
+    return `<div class="legend-row"><span class="legend-dot" style="background:${seg.color}"></span>${seg.label}<span class="legend-val">${pct}%</span></div>`;
+  }).join("") || `<div class="empty-note">Is hafte abhi kuch log nahi hua.</div>`;
+}
+function renderRankList(report){
+  const sorted = report.perDay.slice().sort((a,b)=> b.xp - a.xp);
+  const max = Math.max(1, ...sorted.map(d=>d.xp));
+  const medals = ["🥇","🥈","🥉"];
+  document.getElementById("rankList").innerHTML = sorted.map((d,i)=>`
+    <div class="rank-row ${i===0 && d.xp>0 ? 'top':''}">
+      <div class="rank-medal">${medals[i] || (i+1)}</div>
+      <div style="flex:1;">
+        <div style="display:flex; justify-content:space-between;">
+          <span class="rank-day">${escapeHtml(d.day)}${i===0 && d.xp>0 ? ' Vansh 👑' : ''}</span>
+          <span class="rank-xp">${d.xp} XP</span>
+        </div>
+        <div class="rank-bar-track"><div class="rank-bar-fill" style="width:${Math.round((d.xp/max)*100)}%"></div></div>
+      </div>
+    </div>`).join("");
+}
+
+function refreshProgressView(){
+  renderPersonalBests();
+  renderHeatmap();
+  renderTrendChart();
+  renderXpChart();
+  renderDonut();
+  highlightRankTier();
+  renderWeekReport();
+  if (!state.weekReportSeen) state.weekReportSeen = {};
+  state.weekReportSeen[currentWeekKey()] = true;
+  saveState(state);
+}
+
+/* ================================================================= */
+/* REWARDS VIEW                                                       */
+/* ================================================================= */
+function renderBadges(){
+  const wrap = document.getElementById("badgeStrip");
+  const { unlockedSet } = computeUnlockedBadges();
+  document.getElementById("badgeCount").textContent = `${unlockedSet.size}/${BADGES.length}`;
+  wrap.innerHTML = BADGES.map(b=>{
+    const unlocked = unlockedSet.has(b.id);
+    const mystery = b.secret && !unlocked;
+    return `<div class="badge-chip glass ${unlocked?'unlocked':''} ${b.secret?'secret':''}" title="${escapeHtml(mystery ? (b.hint||'Mystery badge — keep grinding') : b.desc)}">
+      <div class="badge-ic">${mystery ? '❔' : b.icon}</div>
+      <div class="badge-name">${mystery ? '???' : escapeHtml(b.name)}</div>
+    </div>`;
+  }).join("");
+}
+function claimFood(idx){
+  const r = state.rewardsLog[idx];
+  r.claimed = true;
+  saveState(state);
+  confettiBurst(28, ["#FFC857","#FF6B4A","#7C6CFF"]);
+  vibrate([40,25,40,25,100]);
+  showRevealOverlay("gift", "Reward taken! 🎉", `${r.icon} ${r.name} — enjoy karo!`, r.icon);
+  renderFoodRewards();
+}
+function claimHotel(idx){
+  const r = state.hotelStays[idx];
+  r.claimed = true;
+  saveState(state);
+  confettiBurst(28, ["#00E5A8","#FFC857","#7C6CFF"]);
+  vibrate([40,25,40,25,100]);
+  showRevealOverlay("gift", "Reward taken! 🏨", `Hotel stay booked for Sat ${r.weekend}`, "🏨");
+  renderHotelRewards();
+}
+function renderFoodRewards(){
+  checkLevelRewards();
+  const host = document.getElementById("foodRewards");
+  if (!state.rewardsLog.length){
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">Level 2 tak pahunchte hi pehla treat unlock hoga 🍕</div>`;
+    return;
+  }
+  const rows = [...state.rewardsLog].reverse();
+  host.innerHTML = rows.map((r)=>{
+    const realIdx = state.rewardsLog.indexOf(r);
+    return `<div class="reward-card glass">
+      <div class="reward-ic">${r.icon}</div>
+      <div class="reward-body">
+        <div class="reward-name">${escapeHtml(r.name)}</div>
+        <div class="reward-meta">Level ${r.level} • unlocked ${r.date}</div>
+      </div>
+      ${r.claimed
+        ? `<div class="reward-status claimed">Done ✓</div>`
+        : `<button class="reward-status pending" style="border:none; cursor:pointer;" onclick="claimFood(${realIdx})">Take Reward 🎁</button>`}
+    </div>`;
+  }).join("");
+}
+function renderHotelRewards(){
+  const host = document.getElementById("hotelRewards");
+  if (!state.hotelStays.length){
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">Pehla level-up hote hi ek weekend hotel stay schedule ho jaayegi 🏨</div>`;
+    return;
+  }
+  const rows = [...state.hotelStays].reverse();
+  host.innerHTML = rows.map((r)=>{
+    const realIdx = state.hotelStays.indexOf(r);
+    return `<div class="reward-card glass">
+      <div class="reward-ic">🏨</div>
+      <div class="reward-body">
+        <div class="reward-name">Hotel Stay Weekend</div>
+        <div class="reward-meta">Earned at Level ${r.level} • Sat ${r.weekend}</div>
+      </div>
+      ${r.claimed
+        ? `<div class="reward-status claimed">Booked ✓</div>`
+        : `<button class="reward-status pending" style="border:none; cursor:pointer;" onclick="claimHotel(${realIdx})">Take Reward 🎁</button>`}
+    </div>`;
+  }).join("");
+}
+function claimTrip(idx){
+  const r = state.tripRewards[idx];
+  r.claimed = true;
+  saveState(state);
+  confettiBurst(40, ["#7C6CFF","#FFC857","#00E5A8"]);
+  vibrate([60,30,60,30,150]);
+  showRevealOverlay("trip", "Trip reward taken! 🧳", `${r.milestone}-day streak trip — plan your 4-5 days!`);
+  renderTripRewards();
+}
+function renderTripRewards(){
+  const list = state.tripRewards || [];
+  const host = document.getElementById("tripRewards");
+  if (!list.length){
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">10-din streak banao (har naya din purane ko beat kare) — 4-5 din ki trip unlock hogi ✈️</div>`;
+    return;
+  }
+  host.innerHTML = [...list].reverse().map(r=>{
+    const realIdx = state.tripRewards.indexOf(r);
+    return `<div class="reward-card glass">
+      <div class="reward-ic">🧳</div>
+      <div class="reward-body">
+        <div class="reward-name">4-5 Day Trip</div>
+        <div class="reward-meta">${r.milestone}-day streak • unlocked ${r.date}</div>
+      </div>
+      ${r.claimed
+        ? `<div class="reward-status claimed">Done ✓</div>`
+        : `<button class="reward-status pending" style="border:none; cursor:pointer;" onclick="claimTrip(${realIdx})">Take Reward 🎁</button>`}
+    </div>`;
+  }).join("");
+}
+function renderBossTrophies(){
+  const list = state.bossDefeats || [];
+  document.getElementById("bossTrophyCount").textContent = `${list.length} defeated`;
+  const host = document.getElementById("bossTrophies");
+  if (!list.length){
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">Is hafte 👹 Week Boss ko haraane ke liye Home page pe XP log karo</div>`;
+    return;
+  }
+  host.innerHTML = [...list].reverse().map(b=>`
+    <div class="reward-card glass">
+      <div class="reward-ic">🏆</div>
+      <div class="reward-body">
+        <div class="reward-name">Week Boss #${b.bossNumber} defeated</div>
+        <div class="reward-meta">${b.icon} ${escapeHtml(b.name)} • ${b.date}</div>
+      </div>
+      <div class="reward-status claimed">Done ✓</div>
+    </div>`).join("");
+}
+function renderChestHistory(){
+  const list = state.chestsClaimed || [];
+  document.getElementById("chestCount").textContent = `${list.length} opened`;
+  const host = document.getElementById("chestHistory");
+  if (!list.length){
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">Har 5-din streak milestone pe ek 🎁 chest unlock hota hai</div>`;
+    return;
+  }
+  host.innerHTML = [...list].reverse().map(m=>`
+    <div class="reward-card glass">
+      <div class="reward-ic">🎁</div>
+      <div class="reward-body">
+        <div class="reward-name">${m}-day streak chest</div>
+        <div class="reward-meta">Opened</div>
+      </div>
+      <div class="reward-status claimed">Done ✓</div>
+    </div>`).join("");
+}
+function renderLevelLadder(){
+  const li = levelInfo();
+  const host = document.getElementById("levelLadder");
+  const start = Math.max(1, li.level - 1);
+  const rows = [];
+  for (let lvl = start; lvl <= start + 9; lvl++){
+    const reward = rewardForLevel(Math.max(lvl,2));
+    const reached = lvl <= li.level;
+    const isCurrent = lvl === li.level;
+    rows.push(`<div class="ladder-row ${reached?'reached':''} ${isCurrent?'current':''}">
+      <div class="ladder-lvl">Lv${lvl}</div>
+      <div class="ladder-title">${escapeHtml(levelTitle(lvl))}${lvl===1?' (start)':''}</div>
+      <div class="ladder-reward">${lvl>=2?reward.icon:'—'}</div>
+    </div>`);
+  }
+  host.innerHTML = rows.join("");
+}
+function refreshRewardsView(){
+  renderBadges();
+  renderTripRewards();
+  renderBossTrophies();
+  renderChestHistory();
+  renderFoodRewards();
+  renderHotelRewards();
+  renderLevelLadder();
+}
+
+/* ================= BOOT ================= */
+renderBottomNav("home");
+document.getElementById("quoteText").textContent = todaysQuote();
+renderHome();
+refreshStudyView();
+refreshProgressView();
+refreshRewardsView();
+requestAnimationFrame(drawEkg); // single persistent animation loop — never restarted
+
+// full refresh every minute keeps every view accurate even while backgrounded
+setInterval(()=>{
+  renderHome();
+  refreshStudyView();
+  if (currentView === "progress") refreshProgressView();
+  if (currentView === "rewards") refreshRewardsView();
+}, 60*1000);
+
+// the running stopwatch itself needs a 1-second tick, plus a once-a-minute
+// background notification update so the count stays visible if you switch
+// apps mid-session (see notifyFocusUpdate in app.js for the honest caveats).
+setInterval(()=>{ if (isFocusRunning()) renderStopwatch(); }, 1000);
+setInterval(()=>{
+  if (isFocusRunning()){
+    const elapsedMin = Math.round((Date.now() - state.focusActive.startTs)/60000);
+    notifyFocusUpdate(elapsedMin);
+  }
+}, 60*1000);
+</script>
+</body>
+</html>
