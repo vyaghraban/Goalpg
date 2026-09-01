@@ -234,12 +234,12 @@
       <div class="best-sit-verdict" id="bestSitVerdict"></div>
     </div>
 
-    <div class="sec-head"><div class="sec-title">Aaj ka sitting trend</div><div class="sec-sub">session-by-session, aaj vs kal</div></div>
+    <div class="sec-head"><div class="sec-title">Aaj vs Kal: sitting hour comparison</div><div class="sec-sub">kitni baar, kitni der baithe — sitting-wise</div></div>
     <div class="chart-card glass">
       <canvas id="sessionTrendChart"></canvas>
       <div class="week-legend">
-        <span><span class="dot mint"></span>Aaj (cumulative)</span>
-        <span><span class="dot coral"></span>Kal (cumulative)</span>
+        <span><span class="dot mint"></span>Aaj</span>
+        <span><span class="dot coral"></span>Kal</span>
       </div>
       <div class="best-sit-verdict" id="sessionTrendVerdict" style="margin-top:10px;"></div>
     </div>
@@ -249,15 +249,6 @@
       <canvas id="sessionEfficiencyChart"></canvas>
       <div class="best-sit-verdict" id="sessionEfficiencyVerdict" style="margin-top:10px;"></div>
     </div>
-    <div class="chart-card glass">
-      <canvas id="sessionBreakdownChart"></canvas>
-      <div class="week-legend">
-        <span><span class="dot mint"></span>Video (min)</span>
-        <span><span class="dot violet"></span>Pages</span>
-        <span><span class="dot gold"></span>MCQs</span>
-      </div>
-    </div>
-    <div class="sitting-table-wrap" id="sessionEfficiencyTableWrap"></div>
 
     <div class="sec-head"><div class="sec-title">Best sitting per day</div><div class="sec-sub">last 7 days</div></div>
     <div class="chart-card glass">
@@ -266,19 +257,10 @@
     </div>
 
     <div class="sec-head"><div class="sec-title">Aaj ke sessions</div><div class="sec-sub" id="todayFocusTotal">0m total</div></div>
-    <div class="chart-card glass">
-      <canvas id="todaySessionsChart"></canvas>
-      <div class="best-sit-verdict" id="todaySessionsVerdict" style="margin-top:10px;"></div>
-    </div>
-    <div class="chart-card glass">
-      <canvas id="todaySessionsBreakdownChart"></canvas>
-      <div class="week-legend">
-        <span><span class="dot mint"></span>Video (min)</span>
-        <span><span class="dot violet"></span>Pages</span>
-        <span><span class="dot gold"></span>MCQs</span>
-      </div>
-    </div>
     <div class="sitting-table-wrap" id="sessionListTableWrap"></div>
+
+    <div class="sec-head"><div class="sec-title">Kal ke sessions</div><div class="sec-sub" id="yestFocusTotal">0m total</div></div>
+    <div class="sitting-table-wrap" id="yesterdaySessionsTableWrap"></div>
 
     <div class="sec-head"><div class="sec-title">Manual log</div><div class="sec-sub">bina timer ke seedha log karo</div></div>
     <div class="combo-strip" id="comboStrip"></div>
@@ -962,14 +944,23 @@ function renderBestSit(){
   }
 }
 
-/* ---- Today's sessions: duration-per-sitting chart, video/pages/mcq
-   breakdown chart, and a full table (with subject + vs-previous delta) ---- */
+/* ---- Today's + yesterday's sitting-wise tables: subject + video/pages/mcq
+   filled in per the phase that was actually logged for that sitting. Two
+   tables total (today, yesterday) — no charts duplicated inside them. ---- */
 function renderSessionList(){
-  const trend = sessionTrendForDate(todayStr());
+  const todayTrend = sessionEfficiencyTrend(todayStr());
+  const yestTrend = sessionEfficiencyTrend(yesterdayStr());
   document.getElementById("todayFocusTotal").textContent = `${fmtMin(focusMinutesForDate(todayStr()))} total`;
+  document.getElementById("yestFocusTotal").textContent = `${fmtMin(focusMinutesForDate(yesterdayStr()))} total`;
+  document.getElementById("sessionListTableWrap").innerHTML = sittingTableHtml(todayTrend);
+  document.getElementById("yesterdaySessionsTableWrap").innerHTML = sittingTableHtml(yestTrend);
+}
 
-  const canvas = document.getElementById("todaySessionsChart");
-  const verdictEl = document.getElementById("todaySessionsVerdict");
+/* ---- Aaj vs Kal: sitting hour comparison — pairs sitting #1 with #1,
+   #2 with #2, etc, so it's clear both HOW MANY times and HOW LONG each
+   day's sittings ran, side by side. ---- */
+function renderSessionTrendChart(){
+  const canvas = document.getElementById("sessionTrendChart");
   const dpr = window.devicePixelRatio || 1;
   const w = canvas.clientWidth, h = canvas.clientHeight || 140;
   canvas.width = w*dpr; canvas.height = h*dpr;
@@ -977,119 +968,76 @@ function renderSessionList(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
 
-  if (!trend.length){
-    ctx.fillStyle = "#5E6A82";
-    ctx.font = "600 11px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
-    verdictEl.textContent = "Abhi tak koi session log nahi hua.";
-  } else {
-    const padTop = 22, padBottom = 26, padSide = 8;
-    const n = trend.length;
-    const gap = 10;
-    const barW = Math.max(14, (w - padSide*2 - gap*(n-1)) / n);
-    const usableH = h - padTop - padBottom;
-    const maxVal = Math.max(10, ...trend.map(s=>s.durationMin));
-
-    trend.forEach((s,i)=>{
-      const x = padSide + i*(barW+gap);
-      const barH = Math.max(2, (s.durationMin/maxVal)*usableH);
-      const y = h - padBottom - barH;
-      const color = s.delta === null ? "#7C6CFF" : s.delta >= 0 ? "#00E5A8" : "#FF6B4A";
-      ctx.fillStyle = color;
-      roundRectStudy(ctx, x, y, barW, barH, 5);
-      ctx.fill();
-
-      ctx.fillStyle = "#E9EEF7";
-      ctx.font = "700 10px 'JetBrains Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(fmtMin(s.durationMin), x+barW/2, y-6);
-
-      ctx.fillStyle = "#5E6A82";
-      ctx.font = "600 9px 'JetBrains Mono', monospace";
-      ctx.fillText(`#${s.index}`, x+barW/2, h-8);
-    });
-
-    const totalMin = focusMinutesForDate(todayStr());
-    const avgMin = totalMin / trend.length;
-    verdictEl.textContent = `Aaj ${trend.length} sitting${trend.length>1?'s':''}, total ${fmtMin(totalMin)} — average ${fmtMin(avgMin)} per sitting.`;
-  }
-
-  renderBreakdownChart("todaySessionsBreakdownChart", trend);
-  document.getElementById("sessionListTableWrap").innerHTML = sittingTableHtml(trend, { showSubject:true, showDelta:true });
-}
-
-/* ---- Session-by-session trend: aaj ka cumulative sitting time vs kal ---- */
-function renderSessionTrendChart(){
-  const canvas = document.getElementById("sessionTrendChart");
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 120;
-  canvas.width = w*dpr; canvas.height = h*dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);
-
-  const todayCum = cumulativeSessionSeries(todayStr());
-  const yestCum = cumulativeSessionSeries(yesterdayStr());
-  const n = Math.max(todayCum.length, yestCum.length, 1);
-  // hold the last known value flat past the end of a shorter series, so both
-  // lines are comparable at every session checkpoint on the x-axis
-  const extend = (arr) => { const out=[]; let last=0; for (let i=0;i<n;i++){ if (i<arr.length) last=arr[i]; out.push(last);} return out; };
-  const todaySeries = extend(todayCum);
-  const yestSeries = extend(yestCum);
-  const max = Math.max(10, ...todaySeries, ...yestSeries);
-  const padTop = 10, padBottom = 18;
-  const stepX = n > 1 ? w/(n-1) : w;
-
-  const toPts = (series) => series.map((v,i)=> ({ x: i*stepX, y: h - padBottom - (v/max)*(h-padTop-padBottom) }));
-  const drawLine = (series, color) => {
-    const pts = toPts(series);
-    ctx.beginPath();
-    pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2.5;
-    ctx.lineJoin = "round";
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 7;
-    ctx.stroke();
-    ctx.shadowBlur = 0;
-    pts.forEach(p=>{
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 2.6, 0, Math.PI*2);
-      ctx.fillStyle = color;
-      ctx.fill();
-    });
-  };
-
-  if (n > 0 && yestCum.length){
-    drawLine(yestSeries, "#FF6B4A");
-  }
-  if (n > 0 && todayCum.length){
-    drawLine(todaySeries, "#00E5A8");
-  }
-  if (!todayCum.length && !yestCum.length){
-    ctx.fillStyle = "#5E6A82";
-    ctx.font = "600 11px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
-  }
-
-  ctx.fillStyle = "#5E6A82";
-  ctx.font = "600 9px 'JetBrains Mono', monospace";
-  ctx.textAlign = "center";
-  for (let i=0;i<n;i++) ctx.fillText("#"+(i+1), i*stepX, h-4);
-
+  const todayList = focusSessionsForDate(todayStr());
+  const yestList = focusSessionsForDate(yesterdayStr());
+  const n = Math.max(todayList.length, yestList.length);
   const verdictEl = document.getElementById("sessionTrendVerdict");
-  const trend = todaySittingTrend();
-  if (!trend || trend.count < 2){
-    verdictEl.textContent = "Kam se kam 2 sessions complete karo — tabhi trend dikhega.";
+
+  if (!n){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+    verdictEl.textContent = "Session start karo — yahan aaj vs kal dikhega.";
+    return;
+  }
+
+  const padTop = 20, padBottom = 24, padSide = 8;
+  const groupGap = 12;
+  const groupW = Math.max(26, (w - padSide*2 - groupGap*(n-1)) / n);
+  const barGap = 3;
+  const barW = (groupW - barGap) / 2;
+  const usableH = h - padTop - padBottom;
+  const maxVal = Math.max(10, ...todayList.map(s=>s.durationMin), ...yestList.map(s=>s.durationMin));
+
+  for (let i=0;i<n;i++){
+    const gx = padSide + i*(groupW+groupGap);
+    const tMin = todayList[i] ? todayList[i].durationMin : 0;
+    const yMin = yestList[i] ? yestList[i].durationMin : 0;
+
+    if (yMin > 0){
+      const barH = Math.max(2, (yMin/maxVal)*usableH);
+      const x = gx, y = h - padBottom - barH;
+      ctx.fillStyle = "#FF6B4A";
+      roundRectStudy(ctx, x, y, barW, barH, 4);
+      ctx.fill();
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 8px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(fmtMin(yMin), x+barW/2, y-4);
+    }
+    if (tMin > 0){
+      const barH = Math.max(2, (tMin/maxVal)*usableH);
+      const x = gx+barW+barGap, y = h - padBottom - barH;
+      ctx.fillStyle = "#00E5A8";
+      roundRectStudy(ctx, x, y, barW, barH, 4);
+      ctx.fill();
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 8px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(fmtMin(tMin), x+barW/2, y-4);
+    }
+
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`#${i+1}`, gx+groupW/2, h-8);
+  }
+
+  const totalToday = todayList.reduce((s,x)=>s+x.durationMin,0);
+  const totalYest = yestList.reduce((s,x)=>s+x.durationMin,0);
+  if (!yestList.length){
+    verdictEl.textContent = `Aaj ${todayList.length} sitting, total ${fmtMin(totalToday)} — kal koi session nahi tha.`;
+  } else if (!todayList.length){
+    verdictEl.textContent = `Kal ${yestList.length} sitting, total ${fmtMin(totalYest)} thi — aaj abhi shuru nahi hua.`;
   } else {
-    const dirText = trend.netTrend === "increasing"
-      ? `har agla sitting pichle se average ${fmtMin(Math.abs(trend.avgDelta))} zyada raha — trend Increasing 📈`
-      : trend.netTrend === "decreasing"
-      ? `har agla sitting pichle se average ${fmtMin(Math.abs(trend.avgDelta))} kam raha — trend Decreasing 📉`
-      : `sittings roughly barabar rahi — trend Flat ➡️`;
-    verdictEl.textContent = `Aaj: ${dirText}`;
+    const countLine = todayList.length === yestList.length
+      ? `dono din ${todayList.length} sittings`
+      : `aaj ${todayList.length} vs kal ${yestList.length} sittings`;
+    const timeLine = totalToday >= totalYest
+      ? `aaj ${fmtMin(totalToday - totalYest)} zyada time — aage ho! 🚀`
+      : `kal ${fmtMin(totalYest - totalToday)} zyada time tha — abhi peeche ho.`;
+    verdictEl.textContent = `${countLine}, ${timeLine}`;
   }
 }
 
@@ -1153,95 +1101,30 @@ function renderSessionEfficiencyChart(){
       : `Aakhri sitting (#${last.index}) pichle se ${Math.abs(last.deltaPct)}% kam productive rahi — agli sitting mein zyada push karo!`;
     verdictEl.textContent = `${lastLine} (${better} sitting behtar, ${worst} kamzor aaj tak)`;
   }
-
-  renderBreakdownChart("sessionBreakdownChart", trend);
-  document.getElementById("sessionEfficiencyTableWrap").innerHTML = sittingTableHtml(trend, { showSubject:false, showDelta:false });
 }
 
-/* ---- Reusable: per-sitting video/pages/mcq grouped bar chart. A sitting
-   that only logged one of the three (video-phase / reading-phase) just
-   shows that one bar; a mixed sitting shows all it logged. ---- */
-function renderBreakdownChart(canvasId, list){
-  const canvas = document.getElementById(canvasId);
-  if (!canvas) return;
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
-  canvas.width = w*dpr; canvas.height = h*dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);
-
-  if (!list.length){
-    ctx.fillStyle = "#5E6A82";
-    ctx.font = "600 11px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
-    return;
-  }
-
-  const padTop = 20, padBottom = 22, padSide = 8;
-  const n = list.length;
-  const groupGap = 10;
-  const groupW = Math.max(28, (w - padSide*2 - groupGap*(n-1)) / n);
-  const barGap = 2;
-  const barW = (groupW - barGap*2) / 3;
-  const usableH = h - padTop - padBottom;
-  const maxVal = Math.max(1, ...list.flatMap(s => [s.amounts?.video||0, s.amounts?.reading||0, s.amounts?.mcq||0]));
-  const colors = { video: "#00E5A8", reading: "#7C6CFF", mcq: "#FFC857" };
-
-  list.forEach((s,i)=>{
-    const gx = padSide + i*(groupW+groupGap);
-    ["video","reading","mcq"].forEach((type,ti)=>{
-      const val = (s.amounts && s.amounts[type]) || 0;
-      if (val <= 0) return;
-      const barH = Math.max(2, (val/maxVal)*usableH);
-      const x = gx + ti*(barW+barGap);
-      const y = h - padBottom - barH;
-      ctx.fillStyle = colors[type];
-      roundRectStudy(ctx, x, y, barW, barH, 3);
-      ctx.fill();
-      ctx.fillStyle = "#E9EEF7";
-      ctx.font = "700 8px 'JetBrains Mono', monospace";
-      ctx.textAlign = "center";
-      ctx.fillText(`${Math.round(val)}`, x+barW/2, y-4);
-    });
-    ctx.fillStyle = "#5E6A82";
-    ctx.font = "600 9px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`#${s.index}`, gx+groupW/2, h-6);
-  });
-}
-
-/* ---- Reusable: sitting-by-sitting breakdown table — duration, and how
-   much video/pages/mcq were done in that sitting. Same shape used for both
-   the "sitting hour vs sitting hour" section and "Aaj ke sessions", with
-   subject/delta columns toggled per section. ---- */
-function sittingTableHtml(list, opts){
-  opts = opts || {};
+/* ---- Reusable: sitting-by-sitting breakdown table — duration, subject,
+   and how much video/pages/mcq were done in that sitting. Only the columns
+   that actually apply to a sitting's phase (video-only / reading-only /
+   mixed) get filled in — the rest show "—". ---- */
+function sittingTableHtml(list){
   if (!list.length) return `<div class="best-sit-empty">Abhi tak koi session log nahi hua.</div>`;
   const rows = list.slice().reverse().map(s=>{
     const a = s.amounts || { video:0, reading:0, mcq:0 };
-    const subjectCell = opts.showSubject ? `<td>${escapeHtml((s.detail && s.detail.subject) || "—")}</td>` : "";
-    const deltaCell = opts.showDelta
-      ? `<td class="${s.delta==null ? '' : (s.delta>=0?'sc-up':'sc-down')}">${s.delta==null ? "—" : `${s.delta>=0?'▲':'▼'} ${fmtMin(Math.abs(s.delta))}`}</td>`
-      : "";
     return `<tr>
       <td>#${s.index}</td>
       <td>${formatClockTime(s.startTs)}–${formatClockTime(s.endTs)}</td>
       <td>${fmtMin(s.durationMin)}</td>
-      ${subjectCell}
+      <td>${escapeHtml((s.detail && s.detail.subject) || "—")}</td>
       <td>${a.video ? fmtMin(a.video) : "—"}</td>
       <td>${a.reading ? Math.round(a.reading) : "—"}</td>
       <td>${a.mcq ? Math.round(a.mcq) : "—"}</td>
-      ${deltaCell}
     </tr>`;
   }).join("");
   return `<div class="sitting-table-scroll"><table class="sitting-table">
     <thead><tr>
-      <th>#</th><th>Time</th><th>Duration</th>
-      ${opts.showSubject ? "<th>Subject</th>" : ""}
+      <th>#</th><th>Time</th><th>Duration</th><th>Subject</th>
       <th>🎥 Video</th><th>📖 Pages</th><th>❓ MCQ</th>
-      ${opts.showDelta ? "<th>vs Pichla</th>" : ""}
     </tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
