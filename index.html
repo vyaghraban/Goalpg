@@ -260,12 +260,6 @@
       </div>
     </div>
 
-    <div class="sec-head"><div class="sec-title">Best sitting per day</div><div class="sec-sub">last 7 days</div></div>
-    <div class="chart-card glass">
-      <canvas id="sitChart"></canvas>
-      <div class="chart-legend"><span id="sitStart">–</span><span>Today</span></div>
-    </div>
-
     <div class="sec-head"><div class="sec-title">Aaj ke sessions</div><div class="sec-sub" id="todayFocusTotal">0m total</div></div>
     <div class="sitting-table-wrap" id="sessionListTableWrap"></div>
 
@@ -327,12 +321,6 @@
         <div class="rank-tier glass" data-tier="pro">PRO</div>
         <div class="rank-tier glass" data-tier="ultra">ULTRA PRO</div>
       </div>
-    </div>
-
-    <div class="sec-head"><div class="sec-title">XP growth</div><div class="sec-sub">cumulative</div></div>
-    <div class="chart-card glass">
-      <canvas id="xpChart"></canvas>
-      <div class="chart-legend"><span id="xpStart">–</span><span id="xpEnd">0 XP</span></div>
     </div>
 
     <div class="sec-head"><div class="sec-title">Time split</div><div class="sec-sub">lifetime</div></div>
@@ -447,6 +435,14 @@ function switchView(name, scrollId){
   document.querySelectorAll("#bottomNav .nav-item").forEach(b=> b.classList.toggle("active", b.dataset.view===name));
   currentView = name;
   window.scrollTo({ top: 0, behavior: "instant" in window ? "instant" : "auto" });
+  // Render this view's own content right when it's opened — the canvases are
+  // only laid out with real width once their section is visible, and doing
+  // this on demand (instead of pre-rendering every view up front at boot)
+  // is what keeps the initial app open fast.
+  if (name === "home") renderHome();
+  else if (name === "study") refreshStudyView();
+  else if (name === "progress") refreshProgressView();
+  else if (name === "rewards") refreshRewardsView();
   if (scrollId){
     setTimeout(()=>{ const el=document.getElementById(scrollId); if (el) el.scrollIntoView({behavior:"smooth", block:"start"}); }, 80);
   }
@@ -816,7 +812,6 @@ document.getElementById("swBtn").addEventListener("click", ()=>{
   renderSessionTrendChart();
   renderSessionEfficiencyChart();
   renderSessionBreakdownChart();
-  renderSitChart();
   pulseDuelCard();
 });
 
@@ -1221,46 +1216,6 @@ function roundRectStudy(ctx,x,y,w,h,r){
   ctx.arcTo(x,y,x+w,y,r);
   ctx.closePath();
 }
-function renderSitChart(){
-  const canvas = document.getElementById("sitChart");
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 100;
-  canvas.width = w*dpr; canvas.height = h*dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);
-
-  const days = 7;
-  const vals = [];
-  for (let i=days-1;i>=0;i--){
-    const best = bestSessionForDate(daysAgoStr(i));
-    vals.push(best ? best.durationMin : 0);
-  }
-  const max = Math.max(10, ...vals);
-  const padTop = 10, padBottom = 16;
-  const barW = w/days;
-
-  vals.forEach((v,i)=>{
-    const bh = (v/max) * (h-padTop-padBottom);
-    const x = i*barW + barW*0.22;
-    const y = h - padBottom - bh;
-    const isToday = i === days-1;
-    const grad = ctx.createLinearGradient(0,y,0,h-padBottom);
-    if (isToday){ grad.addColorStop(0,"#00E5A8"); grad.addColorStop(1,"#00E5A855"); }
-    else { grad.addColorStop(0,"#7C6CFF"); grad.addColorStop(1,"#7C6CFF33"); }
-    ctx.fillStyle = grad;
-    roundRectStudy(ctx, x, y, barW*0.56, Math.max(2,bh), 3);
-    ctx.fill();
-    ctx.fillStyle = "#5E6A82";
-    ctx.font = "600 8px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    const d = new Date(daysAgoStr(days-1-i));
-    ctx.fillText(d.toLocaleDateString(undefined,{weekday:'narrow'}), x + barW*0.28, h-4);
-  });
-
-  document.getElementById("sitStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-}
-
 /* ---- Manual log form (video/reading/mcq, gated by phase) ---- */
 function renderComboStrip(){
   const strip = document.getElementById("comboStrip");
@@ -1487,7 +1442,6 @@ function refreshStudyView(){
   renderSessionTrendChart();
   renderSessionEfficiencyChart();
   renderSessionBreakdownChart();
-  renderSitChart();
   const phaseNow = currentPhase();
   renderLogForm(phaseNow);
   renderSubjectGrid();
@@ -1547,48 +1501,6 @@ function renderTrendChart(){
   });
 
   document.getElementById("trendStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-}
-function renderXpChart(){
-  const canvas = document.getElementById("xpChart");
-  const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
-  canvas.width = w*dpr; canvas.height = h*dpr;
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  ctx.clearRect(0,0,w,h);
-
-  const days = 14;
-  const vals = [];
-  for (let i = days-1; i>=0; i--) vals.push(cumulativeXPuntil(daysAgoStr(i)));
-  const max = Math.max(10, ...vals);
-  const padTop = 10, padBottom = 6;
-  const stepX = w/(days-1);
-
-  const pts = vals.map((v,i)=> ({ x: i*stepX, y: h - padBottom - (v/max)*(h-padTop-padBottom) }));
-
-  ctx.beginPath();
-  ctx.moveTo(pts[0].x, h-padBottom);
-  pts.forEach(p=> ctx.lineTo(p.x, p.y));
-  ctx.lineTo(pts[pts.length-1].x, h-padBottom);
-  ctx.closePath();
-  const fillGrad = ctx.createLinearGradient(0,0,0,h);
-  fillGrad.addColorStop(0, "rgba(0,229,168,0.35)");
-  fillGrad.addColorStop(1, "rgba(0,229,168,0.02)");
-  ctx.fillStyle = fillGrad;
-  ctx.fill();
-
-  ctx.beginPath();
-  pts.forEach((p,i)=> i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
-  ctx.strokeStyle = "#00E5A8";
-  ctx.lineWidth = 2.5;
-  ctx.lineJoin = "round";
-  ctx.shadowColor = "#00E5A8";
-  ctx.shadowBlur = 8;
-  ctx.stroke();
-  ctx.shadowBlur = 0;
-
-  document.getElementById("xpStart").textContent = new Date(daysAgoStr(days-1)).toLocaleDateString(undefined,{month:'short',day:'numeric'});
-  document.getElementById("xpEnd").textContent = `${Math.round(vals[vals.length-1])} XP`;
 }
 function renderDonut(){
   const canvas = document.getElementById("donutChart");
@@ -1837,7 +1749,6 @@ function refreshProgressView(){
   renderPersonalBests();
   renderHeatmap();
   renderTrendChart();
-  renderXpChart();
   renderDonut();
   highlightRankTier();
   renderWeekReport();
@@ -2020,15 +1931,16 @@ function refreshRewardsView(){
 renderBottomNav("home");
 document.getElementById("quoteText").textContent = todaysQuote();
 renderHome();
-refreshStudyView();
-refreshProgressView();
-refreshRewardsView();
+renderStopwatch(); // header's live-session chip needs to be right even though we start on home
 requestAnimationFrame(drawEkg); // single persistent animation loop — never restarted
 
-// full refresh every minute keeps every view accurate even while backgrounded
+// full refresh every minute keeps the OPEN view accurate even while backgrounded —
+// hidden views are skipped and simply re-render themselves the moment you switch
+// to them (see switchView), so we're never doing chart work no one can see.
 setInterval(()=>{
   renderHome();
-  refreshStudyView();
+  renderStopwatch();
+  if (currentView === "study") refreshStudyView();
   if (currentView === "progress") refreshProgressView();
   if (currentView === "rewards") refreshRewardsView();
 }, 60*1000);
