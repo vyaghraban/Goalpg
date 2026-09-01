@@ -143,6 +143,7 @@ canvas#ekg{display:block; width:100%; height:88px; margin-top:6px;}
 .level-title-row{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px;}
 .level-title{font-family:var(--font-display); font-weight:700; font-size:13.5px;}
 .level-xp-text{font-family:var(--font-mono); font-size:10.5px; color:var(--text-mid);}
+.level-challenge-note{font-family:var(--font-mono); font-size:9.5px; color:var(--gold); margin-top:6px; line-height:1.4;}
 .xp-bar-track{height:8px; border-radius:999px; background:rgba(255,255,255,0.08); overflow:hidden; position:relative;}
 .xp-bar-fill{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--gold), var(--mint)); transition: width .6s cubic-bezier(.22,1,.36,1); position:relative; overflow:hidden;}
 .xp-bar-fill::after{
@@ -488,12 +489,13 @@ canvas#xpChart{width:100%; height:110px; display:block;}
 .best-sit-verdict{text-align:center; font-size:11.5px; color:var(--text-mid); margin-top:10px; line-height:1.4;}
 
 .session-list{display:flex; flex-direction:column; gap:8px;}
-.session-chip{display:flex; align-items:center; justify-content:space-between; padding:10px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.04); border:1px solid var(--line); font-size:12px; gap:10px;}
+.session-chip{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; padding:10px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.04); border:1px solid var(--line); font-size:12px; gap:6px 10px;}
 .session-chip .sc-range{font-family:var(--font-mono); color:var(--text-mid); font-size:11px; display:flex; flex-direction:column; gap:3px;}
 .session-chip .sc-dur{font-family:var(--font-display); font-weight:700; color:var(--mint); flex:none;}
 .sc-delta{font-family:var(--font-mono); font-size:9.5px; font-weight:700; width:fit-content;}
 .sc-delta.up{color:var(--mint);}
 .sc-delta.down{color:var(--coral);}
+.sc-detail{font-family:var(--font-mono); font-size:10.5px; color:var(--text-low); flex-basis:100%;}
 
 canvas#sitChart{width:100%; height:100px; display:block;}
 canvas#sessionTrendChart{width:100%; height:120px; display:block;}
@@ -517,6 +519,22 @@ canvas#weekCumChart{width:100%; height:110px; display:block;}
 .dot.coral{background:var(--coral);}
 .dot.violet{background:var(--violet);}
 .dot.gold{background:var(--gold);}
+
+canvas#sessionEfficiencyChart{width:100%; height:140px; display:block;}
+canvas#sessionBreakdownChart{width:100%; height:140px; display:block;}
+canvas#todaySessionsChart{width:100%; height:140px; display:block;}
+canvas#todaySessionsBreakdownChart{width:100%; height:140px; display:block;}
+
+.sitting-table-wrap{border-radius:var(--radius-lg); padding:4px; margin-bottom:14px;}
+.sitting-table-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch; border-radius:var(--radius-lg); border:1px solid var(--line); background:rgba(255,255,255,0.03);}
+.sitting-table{width:100%; border-collapse:collapse; font-size:11px; font-family:var(--font-mono); white-space:nowrap;}
+.sitting-table th, .sitting-table td{padding:9px 10px; text-align:center; border-bottom:1px solid var(--line);}
+.sitting-table thead th{color:var(--text-low); font-size:9.5px; text-transform:uppercase; letter-spacing:0.06em; font-weight:700; background:rgba(255,255,255,0.03);}
+.sitting-table tbody tr:last-child td{border-bottom:none;}
+.sitting-table tbody tr:nth-child(odd){background:rgba(255,255,255,0.02);}
+.sitting-table td:first-child, .sitting-table th:first-child{color:var(--text-mid); font-weight:700;}
+.sitting-table td.sc-up{color:var(--mint); font-weight:700;}
+.sitting-table td.sc-down{color:var(--coral); font-weight:700;}
 
 .rank-list{display:flex; flex-direction:column; gap:8px;}
 .rank-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.04); border:1px solid var(--line);}

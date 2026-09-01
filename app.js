@@ -33,6 +33,45 @@ const SUBJECT_TABLE = [
   ["Rheumatology", 88, 20],
   ["Surgery", 567, 68],
 ];
+/* ================= DATE HELPERS ================= */
+// A "study day" runs from 9:00 AM to the next day's 9:00 AM — logging at,
+// say, 2 AM still belongs to the PREVIOUS study day (Naya Vansh = 9am today
+// to 9am tomorrow). Every date-keyed thing in the app (logs, sessions,
+// streaks, boss week, etc.) is built on todayStr()/yesterdayStr()/
+// daysAgoStr(), so shifting the boundary here changes it everywhere.
+// Declared before STORAGE below since seedState()/loadState() call todayStr()
+// as soon as the app boots.
+const DAY_START_HOUR = 9;
+// Plain local calendar date of d — NO 9am shift. Use this for dates that are
+// already a target calendar day (a future Saturday, a Sun..Sat week label)
+// rather than "which study day is this moment part of".
+function calendarDateStr(d){
+  d = d || new Date();
+  const y = d.getFullYear(), m = String(d.getMonth()+1).padStart(2,"0"), day = String(d.getDate()).padStart(2,"0");
+  return `${y}-${m}-${day}`;
+}
+// How far (in hours) a moment is past this study day's 9am start — 0 right
+// at 9am, wraps past midnight, up to just under 24 by 8:59am next day.
+function hoursIntoStudyDay(d){
+  d = d || new Date();
+  return (d.getHours() - DAY_START_HOUR + 24) % 24;
+}
+function todayStr(d){
+  d = d || new Date();
+  const shifted = new Date(d.getTime() - DAY_START_HOUR*60*60*1000);
+  return calendarDateStr(shifted);
+}
+function yesterdayStr(){ const d = new Date(); d.setDate(d.getDate()-1); return todayStr(d); }
+function daysAgoStr(n){ const d = new Date(); d.setDate(d.getDate()-n); return todayStr(d); }
+function nextSaturdayStr(){
+  const d = new Date();
+  const day = d.getDay(); // 0 Sun .. 6 Sat
+  let add = (6 - day + 7) % 7;
+  if (add === 0) add = 7; // always the *next* Saturday, not today
+  d.setDate(d.getDate() + add);
+  return calendarDateStr(d);
+}
+
 /* ================= STORAGE ================= */
 const STORAGE_KEY = "neetpg_ranker_v2";
 
@@ -124,19 +163,6 @@ function saveState(s){ localStorage.setItem(STORAGE_KEY, JSON.stringify(s)); }
 
 let state = loadState();
 
-/* ================= DATE HELPERS ================= */
-function todayStr(d){ d = d || new Date(); return d.toISOString().slice(0,10); }
-function yesterdayStr(){ const d = new Date(); d.setDate(d.getDate()-1); return todayStr(d); }
-function daysAgoStr(n){ const d = new Date(); d.setDate(d.getDate()-n); return todayStr(d); }
-function nextSaturdayStr(){
-  const d = new Date();
-  const day = d.getDay(); // 0 Sun .. 6 Sat
-  let add = (6 - day + 7) % 7;
-  if (add === 0) add = 7; // always the *next* Saturday, not today
-  d.setDate(d.getDate() + add);
-  return todayStr(d);
-}
-
 /* ================= PHASE LOGIC ================= */
 function videoPhaseComplete(){
   return Object.values(state.subjects).every(s => s.videoDone >= s.videoTotal);
@@ -196,8 +222,10 @@ function rankTier(streak){
 const RANK_LABEL = { noob: "Noob", pro: "Pro", ultra: "Ultra Pro" };
 const RANK_COLOR = { noob: "#7C8BA3", pro: "#00E5A8", ultra: "#FFC857" };
 
-// RPG-style level curve: xpForLevel(n) = XP required to REACH level n (n=1 -> 0)
-function xpForLevel(n){ return 60 * (n - 1) * n; }
+// RPG-style level curve: xpForLevel(n) = XP required to REACH level n (n=1 -> 0).
+// Cubic-ish growth (steeper than the old 60*(n-1)*n) so levels take real
+// grinding instead of flying by after a couple of sessions.
+function xpForLevel(n){ return Math.round(45 * (n - 1) * n * (n + 3) / 4); }
 const LEVEL_TITLES = [
   [1, "Rookie Grinder"], [4, "Focused Scholar"], [7, "Study Warrior"],
   [10, "Exam Slayer"], [14, "Topper Mode"], [18, "PG Legend"], [24, "Rank Machine"]
@@ -207,15 +235,36 @@ function levelTitle(lvl){
   for (const [minLvl, title] of LEVEL_TITLES){ if (lvl >= minLvl) t = title; }
   return t;
 }
+// Distinct calendar study-days actually logged (ignores bonus-only chest
+// entries, which aren't real study).
+function distinctStudyDaysCount(){
+  return new Set(state.logs.filter(l => l.type !== "bonus").map(l => l.date)).size;
+}
+// Beyond level 1, every level also demands a real spread of study DAYS, not
+// just a raw XP total — so you can't level up purely by cramming one huge
+// sitting. Requirement grows a little each level.
+function levelChallengeRequirement(lvl){ return Math.max(1, Math.ceil((lvl - 1) * 1.5)); }
+function levelChallengeMet(lvl){ return distinctStudyDaysCount() >= levelChallengeRequirement(lvl); }
 function levelInfo(){
   const xp = totalXP();
+  // raw level the XP alone would reach
+  let xpLvl = 1;
+  while (xpForLevel(xpLvl+1) <= xp) xpLvl++;
+  // effective level also requires each level's day-spread challenge to be met
   let lvl = 1;
-  while (xpForLevel(lvl+1) <= xp) lvl++;
+  while (lvl < xpLvl && levelChallengeMet(lvl+1)) lvl++;
+  const xpReady = lvl < xpLvl; // XP is enough for the next level, challenge isn't met yet
   const floor = xpForLevel(lvl);
   const ceil = xpForLevel(lvl+1);
   const into = xp - floor;
   const span = Math.max(1, ceil - floor);
-  return { level: lvl, xp, into, span, pct: Math.min(100, Math.round((into/span)*100)) };
+  const challengeNeed = levelChallengeRequirement(lvl+1);
+  const challengeHave = distinctStudyDaysCount();
+  return {
+    level: lvl, xp, into, span, pct: Math.min(100, Math.round((into/span)*100)),
+    xpReady, challengeNeed, challengeHave,
+    challengeLabel: xpReady ? `XP ready — ${challengeHave}/${challengeNeed} alag din padha, Level ${lvl+1} ke liye chahiye` : null
+  };
 }
 
 /* ================= COMBO MULTIPLIER (same-day logging streak) ================= */
@@ -243,9 +292,9 @@ function consumeDoubleXpIfAvailable(){
 // A fresh "boss" spawns every calendar week (Sun-Sat). Logging XP damages it;
 // XP needed scales gently with player level so it stays a real challenge.
 function weekStartStr(){
-  const d = new Date();
+  const d = new Date(todayStr() + "T00:00:00");
   d.setDate(d.getDate() - d.getDay());
-  return todayStr(d);
+  return calendarDateStr(d);
 }
 function bossMaxHp(){
   const lvl = levelInfo().level;
@@ -254,7 +303,7 @@ function bossMaxHp(){
 function weeklyXpEarned(weekStart){
   const start = new Date(weekStart);
   const end = new Date(weekStart); end.setDate(end.getDate() + 7);
-  const endStr = todayStr(end);
+  const endStr = calendarDateStr(end);
   return state.logs.filter(l => l.date >= weekStart && l.date < endStr)
     .reduce((s,l)=> s + xpForEntry(l), 0);
 }
@@ -284,11 +333,11 @@ const WEEKDAY_SHORT = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
 // Sun..Sat dates for the week containing dateStr (defaults to today).
 function weekDatesFor(dateStr){
-  const base = dateStr ? new Date(dateStr) : new Date();
+  const base = new Date((dateStr || todayStr()) + "T00:00:00");
   const start = new Date(base);
   start.setDate(base.getDate() - base.getDay());
   const days = [];
-  for (let i=0;i<7;i++){ const d = new Date(start); d.setDate(start.getDate()+i); days.push(todayStr(d)); }
+  for (let i=0;i<7;i++){ const d = new Date(start); d.setDate(start.getDate()+i); days.push(calendarDateStr(d)); }
   return days;
 }
 
@@ -431,36 +480,48 @@ function stopFocusSession(){
 }
 
 // Called from the "log study detail" card shown right after Stop. Turns the
-// just-finished session into a real XP log entry (video/reading/mcq, tied to
-// the session's actual subject/amount) — this is what feeds subject
-// progress AND the today-vs-yesterday Vansh duel. Combo/double-XP tokens
-// apply exactly like the manual log form.
+// just-finished session into real XP log entries — tied to the session's
+// actual subject/amounts — this is what feeds subject progress AND the
+// today-vs-yesterday Vansh duel. Combo/double-XP tokens apply exactly like
+// the manual log form.
+//
+// detail = { subject, video, reading, mcq } — any of video/reading/mcq can be
+// 0/undefined. A sitting can now log more than one of these at once (a
+// "mixed" sitting — e.g. some video AND some MCQs in the same sit), each
+// becoming its own log entry so existing per-type XP/achievement logic
+// (which only ever understood one type per entry) keeps working unchanged.
 function logStudySession(session, detail){
-  const { type, subject, amount } = detail;
-  if (!amount || amount <= 0) return null;
+  const { subject } = detail;
+  const parts = [];
+  if (detail.video > 0) parts.push({ type: "video", amount: detail.video });
+  if (detail.reading > 0) parts.push({ type: "reading", amount: detail.reading });
+  if (detail.mcq > 0) parts.push({ type: "mcq", amount: detail.mcq });
+  if (!parts.length) return null;
+
   const comboN = comboCountTodayBeforeNewEntry() + 1;
   const comboMult = comboMultiplierForN(comboN);
   const usedToken = consumeDoubleXpIfAvailable();
   const xpMult = comboMult * (usedToken ? 2 : 1);
 
-  const logEntry = { id: session.id+"-xp", date: session.date, subject: subject||null, phase: null, type, amount, xpMult, ts: session.startTs };
-  state.logs.push(logEntry);
-
   let justCompleted = false;
-  if (subject && (type === "video" || type === "reading")){
-    const s = state.subjects[subject];
-    if (s){
-      if (type === "video"){
-        const wasComplete = s.videoDone >= s.videoTotal;
-        s.videoDone = Math.min(s.videoTotal, s.videoDone + amount);
-        if (!wasComplete && s.videoDone >= s.videoTotal) justCompleted = true;
-      } else {
-        const wasComplete = s.pagesDone >= s.pagesTotal;
-        s.pagesDone = Math.min(s.pagesTotal, s.pagesDone + amount);
-        if (!wasComplete && s.pagesDone >= s.pagesTotal) justCompleted = true;
+  parts.forEach(p=>{
+    const logEntry = { id: `${session.id}-xp-${p.type}`, date: session.date, subject: subject||null, phase: null, type: p.type, amount: p.amount, xpMult, ts: session.startTs };
+    state.logs.push(logEntry);
+    if (subject && (p.type === "video" || p.type === "reading")){
+      const s = state.subjects[subject];
+      if (s){
+        if (p.type === "video"){
+          const wasComplete = s.videoDone >= s.videoTotal;
+          s.videoDone = Math.min(s.videoTotal, s.videoDone + p.amount);
+          if (!wasComplete && s.videoDone >= s.videoTotal) justCompleted = true;
+        } else {
+          const wasComplete = s.pagesDone >= s.pagesTotal;
+          s.pagesDone = Math.min(s.pagesTotal, s.pagesDone + p.amount);
+          if (!wasComplete && s.pagesDone >= s.pagesTotal) justCompleted = true;
+        }
       }
     }
-  }
+  });
   saveState(state);
   return { justCompleted, usedToken, comboMult, comboN };
 }
@@ -508,6 +569,76 @@ function bestSittingComparison(){
   return { today, yest, ahead };
 }
 
+// All XP log entries tied to a given sitting — a sitting can now have more
+// than one (a "mixed" sitting logs video AND reading AND/or mcq as separate
+// entries, each id'd session.id+"-xp-"+type). The plain old single-entry id
+// (session.id+"-xp", from logStudySessionAsPlainFocus or older saved data)
+// still matches too, so nothing already saved breaks.
+function sessionLogEntries(session){
+  const prefix = session.id + "-xp";
+  return state.logs.filter(l => l.id === prefix || l.id.startsWith(prefix + "-"));
+}
+// What was actually studied in a given sitting. Returns null only if
+// nothing was logged at all; a plain "focus" entry (no subject specified)
+// is still returned as-is. `phase` is "video"/"reading"/"mcq" when only one
+// thing was logged, or "mixed" when more than one was — this is the
+// video-phase/reading-phase/mixed-phase split used in the sitting-hour
+// breakdown table and charts.
+function sessionStudyDetail(session){
+  const entries = sessionLogEntries(session);
+  if (!entries.length) return null;
+  const labels = {
+    video: (a)=> `🎥 ${fmtMin(a)} video`,
+    reading: (a)=> `📖 ${Math.round(a)} pages`,
+    mcq: (a)=> `❓ ${Math.round(a)} MCQs`,
+    focus: ()=> `⏱️ Sirf time, kuch specify nahi kiya`,
+  };
+  const parts = entries.map(e => ({ type: e.type, amount: e.amount, label: (labels[e.type]||labels.focus)(e.amount) }));
+  const subjectEntry = entries.find(e => e.subject);
+  const studyParts = parts.filter(p => p.type !== "focus");
+  const phase = studyParts.length > 1 ? "mixed" : (studyParts[0] ? studyParts[0].type : (parts[0] ? parts[0].type : null));
+  return { parts, subject: subjectEntry ? subjectEntry.subject : null, phase, label: parts.map(p=>p.label).join(" · ") };
+}
+// Per-type raw amounts logged in a sitting — {video, reading, mcq} minutes/
+// pages/MCQs. Whichever are 0 simply weren't part of that sitting (a
+// video-only sitting has reading:0, mcq:0, etc).
+function sessionTypeAmounts(session){
+  const entries = sessionLogEntries(session);
+  const out = { video: 0, reading: 0, mcq: 0 };
+  entries.forEach(e=>{ if (out.hasOwnProperty(e.type)) out[e.type] += e.amount; });
+  return out;
+}
+// "Study-equivalent minutes" a session actually produced — video minutes
+// count directly, reading/mcq are converted onto the same scale using the
+// existing XP weights (W_PAGE/W_MCQ), and a plain unspecified-focus sitting
+// counts as 0. This is the raw amount only — no combo/bonus multiplier —
+// so gamification bonuses don't distort how productive a sitting really was.
+// A mixed sitting (video + reading + mcq all logged) sums all of them.
+function sessionOutputMinutes(session){
+  const entries = sessionLogEntries(session);
+  return entries.reduce((sum, entry)=>{
+    if (entry.type === "video") return sum + entry.amount * W_VIDEO;
+    if (entry.type === "reading") return sum + entry.amount * W_PAGE;
+    if (entry.type === "mcq") return sum + entry.amount * W_MCQ;
+    return sum; // plain focus — time sat, but nothing concrete logged
+  }, 0);
+}
+// Per-sitting "efficiency": how much of the sitting's own duration actually
+// went into logged studying, capped at 100%. This is the "40 min video in a
+// 1hr sitting vs 30 min next sitting" comparison — each sitting is scored
+// against the one right before it so a drop is visible immediately.
+function sessionEfficiencyTrend(dateStr){
+  const list = focusSessionsForDate(dateStr);
+  return list.map((s,i)=>{
+    const outputMin = sessionOutputMinutes(s);
+    const pct = s.durationMin > 0 ? Math.min(100, Math.round((outputMin / s.durationMin) * 100)) : 0;
+    return { ...s, index: i+1, outputMin, pct, detail: sessionStudyDetail(s), amounts: sessionTypeAmounts(s) };
+  }).map((s,i,arr)=>{
+    const prevPct = i>0 ? arr[i-1].pct : null;
+    return { ...s, prevPct, deltaPct: prevPct===null ? null : s.pct - prevPct };
+  });
+}
+
 // Session-by-session trend for one date: each entry knows how it compares
 // to the sitting right before it — this is the "agla sitting hour pichle se
 // zyada hua ya nahi" check, applied within the same day.
@@ -516,7 +647,7 @@ function sessionTrendForDate(dateStr){
   return list.map((s,i)=>{
     const prevMin = i>0 ? list[i-1].durationMin : null;
     const delta = prevMin===null ? null : s.durationMin - prevMin;
-    return { ...s, index: i+1, prevMin, delta };
+    return { ...s, index: i+1, prevMin, delta, detail: sessionStudyDetail(s), amounts: sessionTypeAmounts(s) };
   });
 }
 // Running total of sitting time, in session order (not clock time) — this is
@@ -544,7 +675,7 @@ function todaySittingTrend(){
 // Used by the Duel Arena: XP yesterday counted only up to the same clock
 // hour as right now, so the comparison is always apples-to-apples.
 function xpUpToHour(dateStr, hourExclusive){
-  return state.logs.filter(l => l.date === dateStr && new Date(l.ts).getHours() < hourExclusive)
+  return state.logs.filter(l => l.date === dateStr && hoursIntoStudyDay(new Date(l.ts)) < hourExclusive)
     .reduce((s,l)=> s + xpForEntry(l), 0);
 }
 // Sends a real OS notification (if permitted) — shared by the daily kickoff,
@@ -582,7 +713,7 @@ function dayFinalVerdict(closedDateStr, priorDateStr){
 // is the "next day 12:01 se chalu" trigger.
 function dailyKickoffPending(){
   const now = new Date();
-  if (now.getHours() !== 0) return false;
+  if (now.getHours() !== DAY_START_HOUR) return false;
   if (!state.dailyKickoffShown) state.dailyKickoffShown = {};
   return !state.dailyKickoffShown[todayStr()];
 }
@@ -616,34 +747,6 @@ function runDailyKickoffIfPending(){
   } else {
     fireKickoff();
   }
-  return true;
-}
-
-/* ================= 9 AM "START STUDY" REMINDER ================= */
-// Fires once per day, any time from 9:00 AM to 9:59 AM, nudging the person
-// to open the Padhai Clock and start their first sitting of the day.
-function nineAmReminderPending(){
-  const now = new Date();
-  if (now.getHours() !== 9) return false;
-  if (!state.nineAmShown) state.nineAmShown = {};
-  return !state.nineAmShown[todayStr()];
-}
-function runNineAmReminderIfPending(){
-  if (!nineAmReminderPending()) return false;
-  if (!state.nineAmShown) state.nineAmShown = {};
-  const key = todayStr();
-  state.nineAmShown[key] = true;
-  Object.keys(state.nineAmShown).forEach(k=>{ if (k !== key) delete state.nineAmShown[k]; });
-  saveState(state);
-
-  const title = "9 baj gaye — padhai shuru! ⏰";
-  const alreadyStudying = isFocusRunning() || focusMinutesForDate(todayStr()) > 0 || scoreForDate(todayStr()) > 0;
-  const body = alreadyStudying
-    ? "Achha chal raha hai — Padhai Clock khol ke agli sitting bhi start kardo!"
-    : "Aaj ka pehla session shuru karne ka time ho gaya. Padhai Clock kholo aur Start dabao!";
-  sendNotification(title, body);
-  toast(body);
-  if (document.getElementById("moodOverlay")) showRevealOverlay("up", title, body, "⏰");
   return true;
 }
 
@@ -692,7 +795,6 @@ function runCheckpointReminderIfPending(){
 // moment the app is opened or brought to the foreground.
 function runDailyRemindersCheck(){
   if (runDailyKickoffIfPending()) return;
-  if (runNineAmReminderIfPending()) return;
   runCheckpointReminderIfPending();
 }
 
@@ -748,10 +850,11 @@ function todaysQuote(){
   return MOTIVATION_QUOTES[hash % MOTIVATION_QUOTES.length];
 }
 
-/* ================= 10-DAY STREAK TRIP REWARD ================= */
-// Every 10-day streak milestone (10, 20, 30...) — where each day genuinely
-// beat the one before it — unlocks a bigger reward: a 4-5 day trip.
-const STREAK_TRIP_INTERVAL = 10;
+/* ================= 30-DAY STREAK TRIP REWARD ================= */
+// Every 30-day streak milestone — where Naya Vansh genuinely beat Purana
+// Vansh EVERY single study day in a row — unlocks a bigger reward: a 4-5 day
+// trip. Big, deliberately rare.
+const STREAK_TRIP_INTERVAL = 30;
 function nextUnclaimedTripMilestone(){
   const streak = streakCount();
   const m = Math.floor(streak / STREAK_TRIP_INTERVAL) * STREAK_TRIP_INTERVAL;
@@ -764,6 +867,28 @@ function grantTripReward(milestone){
   if (!state.tripRewards) state.tripRewards = [];
   const entry = { milestone, date: todayStr(), claimed: false };
   state.tripRewards.push(entry);
+  saveState(state);
+  return entry;
+}
+
+/* ================= 7-DAY STREAK HOTEL-STAY REWARD ================= */
+// Every 7-day streak milestone — Naya Vansh beating Purana Vansh 7 days in a
+// row — unlocks a weekend hotel stay. Independent of level-ups now: this is
+// purely a streak reward, so it keeps rewarding real day-to-day consistency
+// even once leveling has slowed down.
+const STREAK_HOTEL_INTERVAL = 7;
+function nextUnclaimedHotelMilestone(){
+  const streak = streakCount();
+  const m = Math.floor(streak / STREAK_HOTEL_INTERVAL) * STREAK_HOTEL_INTERVAL;
+  if (!state.hotelStays) state.hotelStays = [];
+  const claimedMilestones = state.hotelStays.filter(h => h.milestone != null).map(h => h.milestone);
+  if (m > 0 && !claimedMilestones.includes(m)) return m;
+  return null;
+}
+function grantHotelReward(milestone){
+  if (!state.hotelStays) state.hotelStays = [];
+  const entry = { milestone, weekend: nextSaturdayStr(), claimed: false };
+  state.hotelStays.push(entry);
   saveState(state);
   return entry;
 }
@@ -782,11 +907,12 @@ const REWARD_POOL = [
 function rewardForLevel(level){
   return REWARD_POOL[(level-2) % REWARD_POOL.length]; // level 2 = first reward
 }
-// Call after any XP change. Awards a food reward + a hotel-stay-next-Saturday
-// entry for every level gained since we last checked. Returns newly awarded items.
+// Call after any XP change. Awards a food reward for every level gained
+// since we last checked. Hotel stays are no longer tied to level-ups — see
+// the 7-day streak reward above. Returns newly awarded items.
 function checkLevelRewards(){
   const li = levelInfo();
-  const newly = { foods: [], hotels: [] };
+  const newly = { foods: [] };
   if (!state.lastSeenLevel) state.lastSeenLevel = 1;
   while (state.lastSeenLevel < li.level){
     state.lastSeenLevel++;
@@ -795,9 +921,6 @@ function checkLevelRewards(){
     const foodEntry = { level: lvl, icon: food.icon, name: food.name, date: todayStr(), claimed:false };
     state.rewardsLog.push(foodEntry);
     newly.foods.push(foodEntry);
-    const hotelEntry = { level: lvl, weekend: nextSaturdayStr(), claimed:false };
-    state.hotelStays.push(hotelEntry);
-    newly.hotels.push(hotelEntry);
   }
   if (newly.foods.length) saveState(state);
   return newly;
@@ -824,7 +947,7 @@ function loggedBothWeekendDays(){
     if (new Date(d + "T00:00:00").getDay() === 6){ // Saturday
       const nextDay = new Date(d + "T00:00:00");
       nextDay.setDate(nextDay.getDate() + 1);
-      if (dates.has(todayStr(nextDay))) return true;
+      if (dates.has(calendarDateStr(nextDay))) return true;
     }
   }
   return false;
@@ -1171,9 +1294,9 @@ function initNotificationPermission(){
 }
 
 // Runs on every page load, then every 5 minutes while the app stays open, and
-// again whenever the tab regains focus — this delivers the midnight day-close
-// message and the 9am start-study nudge. Service worker + notification
-// permission are initialised here too.
+// again whenever the tab regains focus — this delivers the 9am day-close +
+// new-day-kickoff message (the study day runs 9am to 9am). Service worker +
+// notification permission are initialised here too.
 initServiceWorker();
 initNotificationPermission();
 runDailyRemindersCheck();

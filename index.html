@@ -105,6 +105,7 @@
           <div class="level-xp-text" id="lvXpText">0 / 60 XP</div>
         </div>
         <div class="xp-bar-track"><div class="xp-bar-fill" id="lvBarFill" style="width:0%"></div></div>
+        <div class="level-challenge-note" id="lvChallengeNote" style="display:none;"></div>
       </div>
     </div>
 
@@ -143,11 +144,20 @@
       <div class="chest-arrow">→</div>
     </div>
 
+    <div class="trip-cta glass" id="hotelCta" style="display:none;">
+      <div class="trip-ic">🏨</div>
+      <div>
+        <div class="trip-title">Weekend Hotel Stay unlocked!</div>
+        <div class="trip-sub" id="hotelSub">7-day streak reward — tap to claim</div>
+      </div>
+      <div class="trip-arrow">→</div>
+    </div>
+
     <div class="trip-cta glass" id="tripCta" style="display:none;">
       <div class="trip-ic">🧳</div>
       <div>
         <div class="trip-title">4-5 Day Trip unlocked!</div>
-        <div class="trip-sub" id="tripSub">10-day streak reward — tap to claim</div>
+        <div class="trip-sub" id="tripSub">30-day streak reward — tap to claim</div>
       </div>
       <div class="trip-arrow">→</div>
     </div>
@@ -234,6 +244,21 @@
       <div class="best-sit-verdict" id="sessionTrendVerdict" style="margin-top:10px;"></div>
     </div>
 
+    <div class="sec-head"><div class="sec-title">Aaj: sitting hour vs sitting hour</div><div class="sec-sub">kis sitting mein kitna padha, agle se compare</div></div>
+    <div class="chart-card glass">
+      <canvas id="sessionEfficiencyChart"></canvas>
+      <div class="best-sit-verdict" id="sessionEfficiencyVerdict" style="margin-top:10px;"></div>
+    </div>
+    <div class="chart-card glass">
+      <canvas id="sessionBreakdownChart"></canvas>
+      <div class="week-legend">
+        <span><span class="dot mint"></span>Video (min)</span>
+        <span><span class="dot violet"></span>Pages</span>
+        <span><span class="dot gold"></span>MCQs</span>
+      </div>
+    </div>
+    <div class="sitting-table-wrap" id="sessionEfficiencyTableWrap"></div>
+
     <div class="sec-head"><div class="sec-title">Best sitting per day</div><div class="sec-sub">last 7 days</div></div>
     <div class="chart-card glass">
       <canvas id="sitChart"></canvas>
@@ -241,7 +266,19 @@
     </div>
 
     <div class="sec-head"><div class="sec-title">Aaj ke sessions</div><div class="sec-sub" id="todayFocusTotal">0m total</div></div>
-    <div class="best-sit-card glass"><div class="session-list" id="sessionList"></div></div>
+    <div class="chart-card glass">
+      <canvas id="todaySessionsChart"></canvas>
+      <div class="best-sit-verdict" id="todaySessionsVerdict" style="margin-top:10px;"></div>
+    </div>
+    <div class="chart-card glass">
+      <canvas id="todaySessionsBreakdownChart"></canvas>
+      <div class="week-legend">
+        <span><span class="dot mint"></span>Video (min)</span>
+        <span><span class="dot violet"></span>Pages</span>
+        <span><span class="dot gold"></span>MCQs</span>
+      </div>
+    </div>
+    <div class="sitting-table-wrap" id="sessionListTableWrap"></div>
 
     <div class="sec-head"><div class="sec-title">Manual log</div><div class="sec-sub">bina timer ke seedha log karo</div></div>
     <div class="combo-strip" id="comboStrip"></div>
@@ -361,7 +398,7 @@
 
     <div class="sec-head">
       <div class="sec-title">🧳 Streak trip rewards</div>
-      <div class="sec-sub">every 10-day streak</div>
+      <div class="sec-sub">every 30-day streak</div>
     </div>
     <div id="tripRewards"></div>
 
@@ -385,7 +422,7 @@
 
     <div class="sec-head">
       <div class="sec-title">🏨 Weekend hotel stays</div>
-      <div class="sec-sub">every level, next Saturday</div>
+      <div class="sec-sub">every 7-day streak</div>
     </div>
     <div id="hotelRewards"></div>
 
@@ -395,7 +432,7 @@
     </div>
     <div class="level-ladder glass" style="border-radius:var(--radius-lg); padding:10px 10px;" id="levelLadder"></div>
 
-    <div class="install-hint">Har level pe naya treat, aur weekend pe hotel stay reward 🎉</div>
+    <div class="install-hint">Har level pe naya treat • 7-day streak = hotel stay • 30-day streak = trip 🎉</div>
   </section>
 
 </div>
@@ -530,6 +567,9 @@ function renderHome(){
   document.getElementById("lvTitle").textContent = levelTitle(li.level);
   document.getElementById("lvXpText").textContent = `${Math.round(li.into)} / ${Math.round(li.span)} XP`;
   document.getElementById("lvBarFill").style.width = li.pct + "%";
+  const noteEl = document.getElementById("lvChallengeNote");
+  if (li.challengeLabel){ noteEl.style.display = "block"; noteEl.textContent = li.challengeLabel; }
+  else { noteEl.style.display = "none"; noteEl.textContent = ""; }
 
   const remainingPhaseText = (()=>{
     const key = phase === "video" ? "videoDone" : phase === "reading" ? "pagesDone" : null;
@@ -549,6 +589,7 @@ function renderHome(){
   renderQuestList();
   renderBossCard();
   renderChestCta();
+  renderHotelCta();
   renderTripCta();
   renderReportCta();
   renderDuelArena();
@@ -595,7 +636,7 @@ function renderBossCard(){
 
 /* ================= DUEL ARENA (session-based) ================= */
 function renderDuelArena(){
-  const hour = new Date().getHours();
+  const hour = hoursIntoStudyDay();
   const todayXpVal = Math.round(scoreForDate(todayStr()));
   const yestXpVal = Math.round(xpUpToHour(yesterdayStr(), hour + 1));
   document.getElementById("duelTodayXp").textContent = todayXpVal + " XP";
@@ -621,6 +662,21 @@ function pulseDuelCard(){
   renderDuelArena();
 }
 
+function renderHotelCta(){
+  const milestone = nextUnclaimedHotelMilestone();
+  const cta = document.getElementById("hotelCta");
+  if (!milestone){ cta.style.display = "none"; return; }
+  cta.style.display = "flex";
+  document.getElementById("hotelSub").textContent = `${milestone}-day streak reward — tap to claim`;
+  cta.onclick = ()=>{
+    grantHotelReward(milestone);
+    cta.style.display = "none";
+    confettiBurst(40, ["#00E5A8","#FFC857","#7C6CFF"]);
+    vibrate([60,30,60,30,150]);
+    showRevealOverlay("gift", "Weekend Hotel Stay unlocked! 🏨", `${milestone}-day streak — har naya din purane ko beat kiya. Enjoy the stay!`, "🏨");
+    setTimeout(renderHome, 2200);
+  };
+}
 function renderTripCta(){
   const milestone = nextUnclaimedTripMilestone();
   const cta = document.getElementById("tripCta");
@@ -699,7 +755,6 @@ function renderQuestList(){
 /* STUDY VIEW — Padhai Clock (stopwatch) + log-on-stop + manual log   */
 /* ================================================================= */
 let pendingSession = null;   // session waiting for "what did you study" detail
-let studyMixedType = "video";
 let manualMixedType = "video";
 
 function fmtStopwatch(ms){
@@ -755,7 +810,6 @@ document.getElementById("swBtn").addEventListener("click", ()=>{
         playSave();
       }
       pendingSession = result;
-      studyMixedType = "video";
       renderLogDetailCard();
     }
   } else {
@@ -768,6 +822,7 @@ document.getElementById("swBtn").addEventListener("click", ()=>{
   renderBestSit();
   renderSessionList();
   renderSessionTrendChart();
+  renderSessionEfficiencyChart();
   renderSitChart();
   pulseDuelCard();
 });
@@ -782,27 +837,33 @@ function renderLogDetailCard(){
   card.style.display = "block";
   const durationLabel = fmtMin(pendingSession.durationMin);
   const rangeLabel = `${formatClockTime(pendingSession.startTs)} – ${formatClockTime(pendingSession.endTs)}`;
-  const label = studyMixedType==='video' ? 'Minutes watched' : studyMixedType==='reading' ? 'Pages read' : 'MCQs solved';
-  const unit = studyMixedType==='video' ? 'min' : studyMixedType==='reading' ? 'pages' : 'MCQs';
-  const defaultAmount = studyMixedType==='video' ? pendingSession.durationMin : '';
 
   card.innerHTML = `
     <div class="logdetail-head">⏱️ Session: ${durationLabel}</div>
-    <div class="logdetail-sub">${rangeLabel} — kya padha, likh do:</div>
-    <div class="type-toggle" id="ldTypeToggle">
-      <button type="button" data-type="video" class="${studyMixedType==='video'?'active':''}">Video</button>
-      <button type="button" data-type="reading" class="${studyMixedType==='reading'?'active':''}">Reading</button>
-      <button type="button" data-type="mcq" class="${studyMixedType==='mcq'?'active':''}">MCQs</button>
-    </div>
+    <div class="logdetail-sub">${rangeLabel} — kya padha, jo bhi apply ho wahi bharo (baaki khaali chhod do):</div>
     <div class="field" style="margin-top:12px;">
       <label>Subject</label>
       <select id="ld_subject">${subjectOptionsHtml()}</select>
     </div>
     <div class="field">
-      <label>${label}</label>
+      <label>🎥 Video watched</label>
       <div class="amount-row">
-        <input type="number" id="ld_amount" min="1" placeholder="e.g. 45" value="${defaultAmount}" />
-        <div class="unit-pill">${unit}</div>
+        <input type="number" id="ld_video" min="0" placeholder="0" value="${pendingSession.durationMin}" />
+        <div class="unit-pill">min</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>📖 Pages read</label>
+      <div class="amount-row">
+        <input type="number" id="ld_reading" min="0" placeholder="0" value="" />
+        <div class="unit-pill">pages</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>❓ MCQs solved</label>
+      <div class="amount-row">
+        <input type="number" id="ld_mcq" min="0" placeholder="0" value="" />
+        <div class="unit-pill">MCQs</div>
       </div>
     </div>
     <div class="logdetail-actions">
@@ -810,20 +871,19 @@ function renderLogDetailCard(){
       <button type="button" class="skip-btn" id="ld_skip">Skip</button>
     </div>
   `;
-  card.querySelectorAll("#ldTypeToggle button").forEach(btn=>{
-    btn.addEventListener("click", ()=>{ studyMixedType = btn.dataset.type; renderLogDetailCard(); });
-  });
   document.getElementById("ld_save").addEventListener("click", handleLogDetailSave);
   document.getElementById("ld_skip").addEventListener("click", handleLogDetailSkip);
 }
 
 function handleLogDetailSave(){
   const subject = document.getElementById("ld_subject").value;
-  const amount = parseFloat(document.getElementById("ld_amount").value);
-  if (!amount || amount <= 0){ toast("Amount enter karo"); return; }
+  const video = parseFloat(document.getElementById("ld_video").value) || 0;
+  const reading = parseFloat(document.getElementById("ld_reading").value) || 0;
+  const mcq = parseFloat(document.getElementById("ld_mcq").value) || 0;
+  if (video <= 0 && reading <= 0 && mcq <= 0){ toast("Kam se kam ek field bharo"); return; }
 
   const levelBefore = levelInfo().level;
-  const result = logStudySession(pendingSession, { type: studyMixedType, subject, amount });
+  const result = logStudySession(pendingSession, { subject, video, reading, mcq });
   if (!result) return;
 
   const rewardResult = checkLevelRewards();
@@ -902,27 +962,61 @@ function renderBestSit(){
   }
 }
 
-/* ---- Today's sessions list (with vs-previous-sitting delta badges) ---- */
+/* ---- Today's sessions: duration-per-sitting chart, video/pages/mcq
+   breakdown chart, and a full table (with subject + vs-previous delta) ---- */
 function renderSessionList(){
   const trend = sessionTrendForDate(todayStr());
   document.getElementById("todayFocusTotal").textContent = `${fmtMin(focusMinutesForDate(todayStr()))} total`;
-  const host = document.getElementById("sessionList");
+
+  const canvas = document.getElementById("todaySessionsChart");
+  const verdictEl = document.getElementById("todaySessionsVerdict");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
   if (!trend.length){
-    host.innerHTML = `<div class="best-sit-empty">Abhi tak koi session log nahi hua.</div>`;
-    return;
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+    verdictEl.textContent = "Abhi tak koi session log nahi hua.";
+  } else {
+    const padTop = 22, padBottom = 26, padSide = 8;
+    const n = trend.length;
+    const gap = 10;
+    const barW = Math.max(14, (w - padSide*2 - gap*(n-1)) / n);
+    const usableH = h - padTop - padBottom;
+    const maxVal = Math.max(10, ...trend.map(s=>s.durationMin));
+
+    trend.forEach((s,i)=>{
+      const x = padSide + i*(barW+gap);
+      const barH = Math.max(2, (s.durationMin/maxVal)*usableH);
+      const y = h - padBottom - barH;
+      const color = s.delta === null ? "#7C6CFF" : s.delta >= 0 ? "#00E5A8" : "#FF6B4A";
+      ctx.fillStyle = color;
+      roundRectStudy(ctx, x, y, barW, barH, 5);
+      ctx.fill();
+
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 10px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(fmtMin(s.durationMin), x+barW/2, y-6);
+
+      ctx.fillStyle = "#5E6A82";
+      ctx.font = "600 9px 'JetBrains Mono', monospace";
+      ctx.fillText(`#${s.index}`, x+barW/2, h-8);
+    });
+
+    const totalMin = focusMinutesForDate(todayStr());
+    const avgMin = totalMin / trend.length;
+    verdictEl.textContent = `Aaj ${trend.length} sitting${trend.length>1?'s':''}, total ${fmtMin(totalMin)} — average ${fmtMin(avgMin)} per sitting.`;
   }
-  host.innerHTML = trend.slice().reverse().map(s=>{
-    let deltaHtml = "";
-    if (s.delta !== null){
-      const up = s.delta >= 0;
-      deltaHtml = `<span class="sc-delta ${up?'up':'down'}">${up?'▲':'▼'} ${fmtMin(Math.abs(s.delta))} vs pichla</span>`;
-    }
-    return `
-    <div class="session-chip">
-      <span class="sc-range">#${s.index} · ${formatClockTime(s.startTs)} – ${formatClockTime(s.endTs)}${deltaHtml}</span>
-      <span class="sc-dur">${fmtMin(s.durationMin)}</span>
-    </div>`;
-  }).join("");
+
+  renderBreakdownChart("todaySessionsBreakdownChart", trend);
+  document.getElementById("sessionListTableWrap").innerHTML = sittingTableHtml(trend, { showSubject:true, showDelta:true });
 }
 
 /* ---- Session-by-session trend: aaj ka cumulative sitting time vs kal ---- */
@@ -999,7 +1093,160 @@ function renderSessionTrendChart(){
   }
 }
 
-/* ---- 7-day best-sitting bar chart ---- */
+/* ---- Sitting-hour vs sitting-hour: how much of each sitting was actually
+   spent studying (video/pages/mcq), each sitting scored against the one
+   right before it ---- */
+function renderSessionEfficiencyChart(){
+  const canvas = document.getElementById("sessionEfficiencyChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const trend = sessionEfficiencyTrend(todayStr());
+  const verdictEl = document.getElementById("sessionEfficiencyVerdict");
+
+  if (!trend.length){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+    verdictEl.textContent = "Ek session complete karo — phir yahan har sitting ka comparison dikhega.";
+    return;
+  }
+
+  const padTop = 22, padBottom = 26, padSide = 8;
+  const n = trend.length;
+  const gap = 10;
+  const barW = Math.max(14, (w - padSide*2 - gap*(n-1)) / n);
+  const usableH = h - padTop - padBottom;
+
+  trend.forEach((s,i)=>{
+    const x = padSide + i*(barW+gap);
+    const barH = Math.max(2, (s.pct/100)*usableH);
+    const y = h - padBottom - barH;
+    const color = s.deltaPct === null ? "#7C6CFF" : s.deltaPct >= 0 ? "#00E5A8" : "#FF6B4A";
+    ctx.fillStyle = color;
+    roundRectStudy(ctx, x, y, barW, barH, 5);
+    ctx.fill();
+
+    ctx.fillStyle = "#E9EEF7";
+    ctx.font = "700 10px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`${s.pct}%`, x+barW/2, y-6);
+
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 9px 'JetBrains Mono', monospace";
+    ctx.fillText(`#${s.index}`, x+barW/2, h-8);
+  });
+
+  const worst = trend.filter(s=>s.deltaPct!==null && s.deltaPct<0).length;
+  const better = trend.filter(s=>s.deltaPct!==null && s.deltaPct>=0).length;
+  if (trend.length < 2){
+    verdictEl.textContent = `Sitting #1: ${trend[0].pct}% time productive rahi (${trend[0].detail ? trend[0].detail.label : 'kuch log nahi hua'}). Ek aur session karo to comparison shuru hoga.`;
+  } else {
+    const last = trend[trend.length-1];
+    const lastLine = last.deltaPct >= 0
+      ? `Aakhri sitting (#${last.index}) pichle se ${last.deltaPct}% behtar rahi — boost jaari rakho! 🚀`
+      : `Aakhri sitting (#${last.index}) pichle se ${Math.abs(last.deltaPct)}% kam productive rahi — agli sitting mein zyada push karo!`;
+    verdictEl.textContent = `${lastLine} (${better} sitting behtar, ${worst} kamzor aaj tak)`;
+  }
+
+  renderBreakdownChart("sessionBreakdownChart", trend);
+  document.getElementById("sessionEfficiencyTableWrap").innerHTML = sittingTableHtml(trend, { showSubject:false, showDelta:false });
+}
+
+/* ---- Reusable: per-sitting video/pages/mcq grouped bar chart. A sitting
+   that only logged one of the three (video-phase / reading-phase) just
+   shows that one bar; a mixed sitting shows all it logged. ---- */
+function renderBreakdownChart(canvasId, list){
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  if (!list.length){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+    return;
+  }
+
+  const padTop = 20, padBottom = 22, padSide = 8;
+  const n = list.length;
+  const groupGap = 10;
+  const groupW = Math.max(28, (w - padSide*2 - groupGap*(n-1)) / n);
+  const barGap = 2;
+  const barW = (groupW - barGap*2) / 3;
+  const usableH = h - padTop - padBottom;
+  const maxVal = Math.max(1, ...list.flatMap(s => [s.amounts?.video||0, s.amounts?.reading||0, s.amounts?.mcq||0]));
+  const colors = { video: "#00E5A8", reading: "#7C6CFF", mcq: "#FFC857" };
+
+  list.forEach((s,i)=>{
+    const gx = padSide + i*(groupW+groupGap);
+    ["video","reading","mcq"].forEach((type,ti)=>{
+      const val = (s.amounts && s.amounts[type]) || 0;
+      if (val <= 0) return;
+      const barH = Math.max(2, (val/maxVal)*usableH);
+      const x = gx + ti*(barW+barGap);
+      const y = h - padBottom - barH;
+      ctx.fillStyle = colors[type];
+      roundRectStudy(ctx, x, y, barW, barH, 3);
+      ctx.fill();
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 8px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${Math.round(val)}`, x+barW/2, y-4);
+    });
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`#${s.index}`, gx+groupW/2, h-6);
+  });
+}
+
+/* ---- Reusable: sitting-by-sitting breakdown table — duration, and how
+   much video/pages/mcq were done in that sitting. Same shape used for both
+   the "sitting hour vs sitting hour" section and "Aaj ke sessions", with
+   subject/delta columns toggled per section. ---- */
+function sittingTableHtml(list, opts){
+  opts = opts || {};
+  if (!list.length) return `<div class="best-sit-empty">Abhi tak koi session log nahi hua.</div>`;
+  const rows = list.slice().reverse().map(s=>{
+    const a = s.amounts || { video:0, reading:0, mcq:0 };
+    const subjectCell = opts.showSubject ? `<td>${escapeHtml((s.detail && s.detail.subject) || "—")}</td>` : "";
+    const deltaCell = opts.showDelta
+      ? `<td class="${s.delta==null ? '' : (s.delta>=0?'sc-up':'sc-down')}">${s.delta==null ? "—" : `${s.delta>=0?'▲':'▼'} ${fmtMin(Math.abs(s.delta))}`}</td>`
+      : "";
+    return `<tr>
+      <td>#${s.index}</td>
+      <td>${formatClockTime(s.startTs)}–${formatClockTime(s.endTs)}</td>
+      <td>${fmtMin(s.durationMin)}</td>
+      ${subjectCell}
+      <td>${a.video ? fmtMin(a.video) : "—"}</td>
+      <td>${a.reading ? Math.round(a.reading) : "—"}</td>
+      <td>${a.mcq ? Math.round(a.mcq) : "—"}</td>
+      ${deltaCell}
+    </tr>`;
+  }).join("");
+  return `<div class="sitting-table-scroll"><table class="sitting-table">
+    <thead><tr>
+      <th>#</th><th>Time</th><th>Duration</th>
+      ${opts.showSubject ? "<th>Subject</th>" : ""}
+      <th>🎥 Video</th><th>📖 Pages</th><th>❓ MCQ</th>
+      ${opts.showDelta ? "<th>vs Pichla</th>" : ""}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
 function roundRectStudy(ctx,x,y,w,h,r){
   ctx.beginPath();
   ctx.moveTo(x+r,y);
@@ -1273,6 +1520,7 @@ function refreshStudyView(){
   renderBestSit();
   renderSessionList();
   renderSessionTrendChart();
+  renderSessionEfficiencyChart();
   renderSitChart();
   const phaseNow = currentPhase();
   renderLogForm(phaseNow);
@@ -1691,7 +1939,7 @@ function renderFoodRewards(){
 function renderHotelRewards(){
   const host = document.getElementById("hotelRewards");
   if (!state.hotelStays.length){
-    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">Pehla level-up hote hi ek weekend hotel stay schedule ho jaayegi 🏨</div>`;
+    host.innerHTML = `<div class="empty-note glass" style="border-radius:var(--radius-md);">7 din lagatar Naya Vansh Purana Vansh ko haraye to pehla weekend hotel stay unlock hoga 🏨</div>`;
     return;
   }
   const rows = [...state.hotelStays].reverse();
@@ -1701,7 +1949,7 @@ function renderHotelRewards(){
       <div class="reward-ic">🏨</div>
       <div class="reward-body">
         <div class="reward-name">Hotel Stay Weekend</div>
-        <div class="reward-meta">Earned at Level ${r.level} • Sat ${r.weekend}</div>
+        <div class="reward-meta">${r.milestone ? `${r.milestone}-day streak` : `Earned at Level ${r.level}`} • Sat ${r.weekend}</div>
       </div>
       ${r.claimed
         ? `<div class="reward-status claimed">Booked ✓</div>`
