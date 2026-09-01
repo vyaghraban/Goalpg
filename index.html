@@ -250,6 +250,16 @@
       <div class="best-sit-verdict" id="sessionEfficiencyVerdict" style="margin-top:10px;"></div>
     </div>
 
+    <div class="sec-head"><div class="sec-title">Aaj: session-wise Video / Pages / MCQ</div><div class="sec-sub">har sitting mein kitna video, pages, mcq hua</div></div>
+    <div class="chart-card glass">
+      <canvas id="sessionBreakdownChart"></canvas>
+      <div class="week-legend">
+        <span><span class="dot violet"></span>Video (hrs)</span>
+        <span><span class="dot mint"></span>Pages</span>
+        <span><span class="dot gold"></span>MCQs</span>
+      </div>
+    </div>
+
     <div class="sec-head"><div class="sec-title">Best sitting per day</div><div class="sec-sub">last 7 days</div></div>
     <div class="chart-card glass">
       <canvas id="sitChart"></canvas>
@@ -805,6 +815,7 @@ document.getElementById("swBtn").addEventListener("click", ()=>{
   renderSessionList();
   renderSessionTrendChart();
   renderSessionEfficiencyChart();
+  renderSessionBreakdownChart();
   renderSitChart();
   pulseDuelCard();
 });
@@ -1101,6 +1112,77 @@ function renderSessionEfficiencyChart(){
       : `Aakhri sitting (#${last.index}) pichle se ${Math.abs(last.deltaPct)}% kam productive rahi — agli sitting mein zyada push karo!`;
     verdictEl.textContent = `${lastLine} (${better} sitting behtar, ${worst} kamzor aaj tak)`;
   }
+}
+
+/* ---- Aaj: per-sitting breakdown of video (hrs) / pages / mcq — three
+   grouped bars per sitting, each metric normalized against its own max
+   for today (they're different units, so sharing one scale would make
+   video basically invisible next to a 40-page reading sitting). ---- */
+function renderSessionBreakdownChart(){
+  const canvas = document.getElementById("sessionBreakdownChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 150;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const trend = sessionEfficiencyTrend(todayStr());
+
+  if (!trend.length){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Koi session abhi tak nahi", w/2, h/2);
+    return;
+  }
+
+  const padTop = 22, padBottom = 24, padSide = 8;
+  const n = trend.length;
+  const groupGap = 10;
+  const groupW = Math.max(30, (w - padSide*2 - groupGap*(n-1)) / n);
+  const barGap = 2;
+  const barW = (groupW - barGap*2) / 3;
+  const usableH = h - padTop - padBottom;
+
+  const videoHrs = trend.map(s => (s.amounts.video||0) / 60);
+  const pages = trend.map(s => s.amounts.reading||0);
+  const mcqs = trend.map(s => s.amounts.mcq||0);
+  const maxVideo = Math.max(0.1, ...videoHrs);
+  const maxPages = Math.max(1, ...pages);
+  const maxMcq = Math.max(1, ...mcqs);
+
+  const series = [
+    { vals: videoHrs, max: maxVideo, color: "#7C6CFF", fmt: v => v>0 ? v.toFixed(1)+"h" : "" },
+    { vals: pages, max: maxPages, color: "#00E5A8", fmt: v => v>0 ? Math.round(v) : "" },
+    { vals: mcqs, max: maxMcq, color: "#FFC857", fmt: v => v>0 ? Math.round(v) : "" },
+  ];
+
+  trend.forEach((s,i)=>{
+    const gx = padSide + i*(groupW+groupGap);
+    series.forEach((ser,si)=>{
+      const val = ser.vals[i];
+      const barH = val > 0 ? Math.max(2, (val/ser.max)*usableH) : 0;
+      const x = gx + si*(barW+barGap);
+      const y = h - padBottom - barH;
+      if (barH > 0){
+        ctx.fillStyle = ser.color;
+        roundRectStudy(ctx, x, y, barW, barH, 3);
+        ctx.fill();
+        const label = ser.fmt(val);
+        if (label !== ""){
+          ctx.fillStyle = "#E9EEF7";
+          ctx.font = "700 7px 'JetBrains Mono', monospace";
+          ctx.textAlign = "center";
+          ctx.fillText(String(label), x+barW/2, y-3);
+        }
+      }
+    });
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText(`#${s.index}`, gx+groupW/2, h-8);
+  });
 }
 
 /* ---- Reusable: sitting-by-sitting breakdown table — duration, subject,
@@ -1404,6 +1486,7 @@ function refreshStudyView(){
   renderSessionList();
   renderSessionTrendChart();
   renderSessionEfficiencyChart();
+  renderSessionBreakdownChart();
   renderSitChart();
   const phaseNow = currentPhase();
   renderLogForm(phaseNow);

@@ -193,14 +193,47 @@ function xpForEntry(l){
   return base * mult;
 }
 
+/* ---- Derived-logs index (PERFORMANCE) ----
+   state.logs only ever grows (nothing removes from it), so anything derived
+   from it — per-day XP totals, per-session log lookups, distinct study days
+   — can be cached and only rebuilt when the array actually got longer.
+   Without this, scoreForDate/cumulativeXPuntil/sessionLogEntries each did a
+   full state.logs.filter() on every single call, and things like
+   streakCount() or the study-view charts called them dozens of times per
+   render — fine with a handful of logs, but it gets slower every week as
+   more sessions pile up, which is what was making charts feel laggy to load. */
+let _logsIndexCache = null;
+let _logsIndexLen = -1;
+function logsIndex(){
+  if (_logsIndexCache && _logsIndexLen === state.logs.length) return _logsIndexCache;
+  const byDateXp = new Map();   // date -> total xp that day
+  const studyDays = new Set();  // dates with a non-bonus log
+  const bySession = new Map();  // session base id -> [log entries for that sitting]
+  for (const l of state.logs){
+    byDateXp.set(l.date, (byDateXp.get(l.date) || 0) + xpForEntry(l));
+    if (l.type !== "bonus") studyDays.add(l.date);
+    const m = l.id.match(/^(.*)-xp(?:-(?:video|reading|mcq))?$/);
+    const base = m ? m[1] : l.id;
+    if (!bySession.has(base)) bySession.set(base, []);
+    bySession.get(base).push(l);
+  }
+  _logsIndexCache = { byDateXp, studyDays, bySession };
+  _logsIndexLen = state.logs.length;
+  return _logsIndexCache;
+}
+
 function scoreForDate(dateStr){
-  return state.logs.filter(l => l.date === dateStr).reduce((sum, l) => sum + xpForEntry(l), 0);
+  return logsIndex().byDateXp.get(dateStr) || 0;
 }
 function totalXP(){
-  return state.logs.reduce((sum,l)=> sum + xpForEntry(l), 0);
+  let sum = 0;
+  logsIndex().byDateXp.forEach(v => sum += v);
+  return sum;
 }
 function cumulativeXPuntil(dateStr){
-  return state.logs.filter(l => l.date <= dateStr).reduce((sum,l)=> sum + xpForEntry(l), 0);
+  let sum = 0;
+  logsIndex().byDateXp.forEach((v, d) => { if (d <= dateStr) sum += v; });
+  return sum;
 }
 
 function streakCount(){
@@ -238,7 +271,7 @@ function levelTitle(lvl){
 // Distinct calendar study-days actually logged (ignores bonus-only chest
 // entries, which aren't real study).
 function distinctStudyDaysCount(){
-  return new Set(state.logs.filter(l => l.type !== "bonus").map(l => l.date)).size;
+  return logsIndex().studyDays.size;
 }
 // Beyond level 1, every level also demands a real spread of study DAYS, not
 // just a raw XP total — so you can't level up purely by cramming one huge
@@ -575,8 +608,7 @@ function bestSittingComparison(){
 // (session.id+"-xp", from logStudySessionAsPlainFocus or older saved data)
 // still matches too, so nothing already saved breaks.
 function sessionLogEntries(session){
-  const prefix = session.id + "-xp";
-  return state.logs.filter(l => l.id === prefix || l.id.startsWith(prefix + "-"));
+  return logsIndex().bySession.get(session.id) || [];
 }
 // What was actually studied in a given sitting. Returns null only if
 // nothing was logged at all; a plain "focus" entry (no subject specified)
@@ -627,9 +659,16 @@ function sessionOutputMinutes(session){
 // went into logged studying, capped at 100%. This is the "40 min video in a
 // 1hr sitting vs 30 min next sitting" comparison — each sitting is scored
 // against the one right before it so a drop is visible immediately.
+// Same date + same underlying logs/sessions -> same result, so the very
+// common case of calling this twice in a row for "today" (once for the
+// sessions table, once for the efficiency chart) reuses the first result
+// instead of recomputing it.
+let _sessionTrendCache = { key: null, result: null };
 function sessionEfficiencyTrend(dateStr){
+  const key = `${dateStr}|${state.logs.length}|${ensureFocusSessions().length}`;
+  if (_sessionTrendCache.key === key) return _sessionTrendCache.result;
   const list = focusSessionsForDate(dateStr);
-  return list.map((s,i)=>{
+  const result = list.map((s,i)=>{
     const outputMin = sessionOutputMinutes(s);
     const pct = s.durationMin > 0 ? Math.min(100, Math.round((outputMin / s.durationMin) * 100)) : 0;
     return { ...s, index: i+1, outputMin, pct, detail: sessionStudyDetail(s), amounts: sessionTypeAmounts(s) };
@@ -637,6 +676,8 @@ function sessionEfficiencyTrend(dateStr){
     const prevPct = i>0 ? arr[i-1].pct : null;
     return { ...s, prevPct, deltaPct: prevPct===null ? null : s.pct - prevPct };
   });
+  _sessionTrendCache = { key, result };
+  return result;
 }
 
 // Session-by-session trend for one date: each entry knows how it compares
