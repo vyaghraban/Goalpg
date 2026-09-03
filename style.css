@@ -531,6 +531,7 @@ canvas#sessionBreakdownChart{width:100%; height:150px; display:block;}
 .sitting-table td:first-child, .sitting-table th:first-child{color:var(--text-mid); font-weight:700;}
 .sitting-table td.sc-up{color:var(--mint); font-weight:700;}
 .sitting-table td.sc-down{color:var(--coral); font-weight:700;}
+.sitting-table tr.week-row-today td{background:rgba(0,229,168,0.08); color:var(--text-hi);}
 
 .rank-list{display:flex; flex-direction:column; gap:8px;}
 .rank-row{display:flex; align-items:center; gap:10px; padding:11px 12px; border-radius:var(--radius-sm); background:rgba(255,255,255,0.04); border:1px solid var(--line);}

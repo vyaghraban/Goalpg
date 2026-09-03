@@ -244,9 +244,13 @@
       <div class="best-sit-verdict" id="sessionTrendVerdict" style="margin-top:10px;"></div>
     </div>
 
-    <div class="sec-head"><div class="sec-title">Aaj: sitting hour vs sitting hour</div><div class="sec-sub">kis sitting mein kitna padha, agle se compare</div></div>
+    <div class="sec-head"><div class="sec-title">Aaj vs Kal: sitting hour vs sitting hour</div><div class="sec-sub">kis sitting mein kitna padha, kal se compare</div></div>
     <div class="chart-card glass">
       <canvas id="sessionEfficiencyChart"></canvas>
+      <div class="week-legend">
+        <span><span class="dot mint"></span>Aaj</span>
+        <span><span class="dot coral"></span>Kal</span>
+      </div>
       <div class="best-sit-verdict" id="sessionEfficiencyVerdict" style="margin-top:10px;"></div>
     </div>
 
@@ -265,6 +269,9 @@
 
     <div class="sec-head"><div class="sec-title">Kal ke sessions</div><div class="sec-sub" id="yestFocusTotal">0m total</div></div>
     <div class="sitting-table-wrap" id="yesterdaySessionsTableWrap"></div>
+
+    <div class="sec-head"><div class="sec-title">Is hafte ka comparison</div><div class="sec-sub" id="weekComparisonTotal">0m total</div></div>
+    <div class="sitting-table-wrap" id="weekComparisonTableWrap"></div>
 
     <div class="sec-head"><div class="sec-title">Manual log</div><div class="sec-sub">bina timer ke seedha log karo</div></div>
     <div class="combo-strip" id="comboStrip"></div>
@@ -960,6 +967,50 @@ function renderSessionList(){
   document.getElementById("yestFocusTotal").textContent = `${fmtMin(focusMinutesForDate(yesterdayStr()))} total`;
   document.getElementById("sessionListTableWrap").innerHTML = sittingTableHtml(todayTrend);
   document.getElementById("yesterdaySessionsTableWrap").innerHTML = sittingTableHtml(yestTrend);
+
+  const report = buildWeekReport(todayStr());
+  document.getElementById("weekComparisonTotal").textContent = `${fmtMin(report.totalFocusMin)} total`;
+  document.getElementById("weekComparisonTableWrap").innerHTML = weekComparisonTableHtml(report);
+}
+
+/* ---- Is hafte ka comparison: one row per day of the current week (Sun-Sat)
+   so it's clear at a glance kab kitna aur kaisa padha — sessions count,
+   total time, and a video/pages/mcq breakdown for that day, with today and
+   the week's best (most focus time) day both called out. ---- */
+function dayTypeAmounts(dateStr){
+  const out = { video: 0, reading: 0, mcq: 0 };
+  state.logs.filter(l => l.date === dateStr).forEach(l=>{
+    if (out.hasOwnProperty(l.type)) out[l.type] += l.amount;
+  });
+  return out;
+}
+function weekComparisonTableHtml(report){
+  const today = todayStr();
+  let bestFocusDate = null, bestFocusMin = -1;
+  report.perDay.forEach(d=>{ if (d.date <= today && d.focusMin > bestFocusMin){ bestFocusMin = d.focusMin; bestFocusDate = d.date; } });
+  const rows = report.perDay.map(d=>{
+    const isFuture = d.date > today;
+    const isToday = d.date === today;
+    const isBest = bestFocusMin > 0 && d.date === bestFocusDate;
+    const sessions = isFuture ? null : focusSessionsForDate(d.date).length;
+    const amounts = isFuture ? null : dayTypeAmounts(d.date);
+    const dateLabel = new Date(d.date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    return `<tr class="${isToday ? 'week-row-today' : ''}">
+      <td>${d.day}${isToday ? " (aaj)" : ""}${isBest ? " 👑" : ""}</td>
+      <td>${dateLabel}</td>
+      <td>${isFuture ? "—" : sessions}</td>
+      <td>${isFuture ? "—" : fmtMin(d.focusMin)}</td>
+      <td>${isFuture || !amounts.video ? "—" : fmtMin(amounts.video)}</td>
+      <td>${isFuture || !amounts.reading ? "—" : Math.round(amounts.reading)}</td>
+      <td>${isFuture || !amounts.mcq ? "—" : Math.round(amounts.mcq)}</td>
+    </tr>`;
+  }).join("");
+  return `<div class="sitting-table-scroll"><table class="sitting-table">
+    <thead><tr>
+      <th>Din</th><th>Date</th><th>Sessions</th><th>Time</th><th>🎥 Video</th><th>📖 Pages</th><th>❓ MCQ</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
 }
 
 /* ---- Aaj vs Kal: sitting hour comparison — pairs sitting #1 with #1,
@@ -1047,9 +1098,10 @@ function renderSessionTrendChart(){
   }
 }
 
-/* ---- Sitting-hour vs sitting-hour: how much of each sitting was actually
-   spent studying (video/pages/mcq), each sitting scored against the one
-   right before it ---- */
+/* ---- Aaj vs Kal: sitting hour vs sitting hour — how much of each sitting
+   was actually spent studying (video/pages/mcq), sitting #1 vs #1, #2 vs #2
+   etc, paired against yesterday the same way the time-comparison chart
+   above pairs durations. ---- */
 function renderSessionEfficiencyChart(){
   const canvas = document.getElementById("sessionEfficiencyChart");
   const dpr = window.devicePixelRatio || 1;
@@ -1059,10 +1111,12 @@ function renderSessionEfficiencyChart(){
   ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,w,h);
 
-  const trend = sessionEfficiencyTrend(todayStr());
+  const todayTrend = sessionEfficiencyTrend(todayStr());
+  const yestTrend = sessionEfficiencyTrend(yesterdayStr());
   const verdictEl = document.getElementById("sessionEfficiencyVerdict");
+  const n = Math.max(todayTrend.length, yestTrend.length);
 
-  if (!trend.length){
+  if (!n){
     ctx.fillStyle = "#5E6A82";
     ctx.font = "600 11px 'JetBrains Mono', monospace";
     ctx.textAlign = "center";
@@ -1072,40 +1126,58 @@ function renderSessionEfficiencyChart(){
   }
 
   const padTop = 22, padBottom = 26, padSide = 8;
-  const n = trend.length;
-  const gap = 10;
-  const barW = Math.max(14, (w - padSide*2 - gap*(n-1)) / n);
+  const groupGap = 10;
+  const groupW = Math.max(26, (w - padSide*2 - groupGap*(n-1)) / n);
+  const barGap = 3;
+  const barW = (groupW - barGap) / 2;
   const usableH = h - padTop - padBottom;
 
-  trend.forEach((s,i)=>{
-    const x = padSide + i*(barW+gap);
-    const barH = Math.max(2, (s.pct/100)*usableH);
-    const y = h - padBottom - barH;
-    const color = s.deltaPct === null ? "#7C6CFF" : s.deltaPct >= 0 ? "#00E5A8" : "#FF6B4A";
-    ctx.fillStyle = color;
-    roundRectStudy(ctx, x, y, barW, barH, 5);
-    ctx.fill();
+  for (let i=0;i<n;i++){
+    const gx = padSide + i*(groupW+groupGap);
+    const yPct = yestTrend[i] ? yestTrend[i].pct : null;
+    const tPct = todayTrend[i] ? todayTrend[i].pct : null;
 
-    ctx.fillStyle = "#E9EEF7";
-    ctx.font = "700 10px 'JetBrains Mono', monospace";
-    ctx.textAlign = "center";
-    ctx.fillText(`${s.pct}%`, x+barW/2, y-6);
+    if (yPct !== null){
+      const barH = Math.max(2, (yPct/100)*usableH);
+      const x = gx, y = h - padBottom - barH;
+      ctx.fillStyle = "#FF6B4A";
+      roundRectStudy(ctx, x, y, barW, barH, 4);
+      ctx.fill();
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 8px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${yPct}%`, x+barW/2, y-4);
+    }
+    if (tPct !== null){
+      const barH = Math.max(2, (tPct/100)*usableH);
+      const x = gx+barW+barGap, y = h - padBottom - barH;
+      ctx.fillStyle = "#00E5A8";
+      roundRectStudy(ctx, x, y, barW, barH, 4);
+      ctx.fill();
+      ctx.fillStyle = "#E9EEF7";
+      ctx.font = "700 8px 'JetBrains Mono', monospace";
+      ctx.textAlign = "center";
+      ctx.fillText(`${tPct}%`, x+barW/2, y-4);
+    }
 
     ctx.fillStyle = "#5E6A82";
     ctx.font = "600 9px 'JetBrains Mono', monospace";
-    ctx.fillText(`#${s.index}`, x+barW/2, h-8);
-  });
+    ctx.textAlign = "center";
+    ctx.fillText(`#${i+1}`, gx+groupW/2, h-8);
+  }
 
-  const worst = trend.filter(s=>s.deltaPct!==null && s.deltaPct<0).length;
-  const better = trend.filter(s=>s.deltaPct!==null && s.deltaPct>=0).length;
-  if (trend.length < 2){
-    verdictEl.textContent = `Sitting #1: ${trend[0].pct}% time productive rahi (${trend[0].detail ? trend[0].detail.label : 'kuch log nahi hua'}). Ek aur session karo to comparison shuru hoga.`;
+  const avgPct = list => list.length ? Math.round(list.reduce((s,x)=>s+x.pct,0)/list.length) : null;
+  const avgToday = avgPct(todayTrend);
+  const avgYest = avgPct(yestTrend);
+  if (avgYest === null){
+    verdictEl.textContent = `Aaj average ${avgToday}% sitting productive rahi — kal koi session nahi tha.`;
+  } else if (avgToday === null){
+    verdictEl.textContent = `Kal average ${avgYest}% productive thi — aaj abhi shuru nahi hua.`;
   } else {
-    const last = trend[trend.length-1];
-    const lastLine = last.deltaPct >= 0
-      ? `Aakhri sitting (#${last.index}) pichle se ${last.deltaPct}% behtar rahi — boost jaari rakho! 🚀`
-      : `Aakhri sitting (#${last.index}) pichle se ${Math.abs(last.deltaPct)}% kam productive rahi — agli sitting mein zyada push karo!`;
-    verdictEl.textContent = `${lastLine} (${better} sitting behtar, ${worst} kamzor aaj tak)`;
+    const diff = avgToday - avgYest;
+    verdictEl.textContent = diff >= 0
+      ? `Aaj average ${avgToday}% vs kal ${avgYest}% — ${diff}% behtar! 🚀`
+      : `Aaj average ${avgToday}% vs kal ${avgYest}% — ${Math.abs(diff)}% kam, agli sitting mein push karo.`;
   }
 }
 
