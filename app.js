@@ -91,7 +91,7 @@ function buildBaselineSubjects(){
     let videoDone = 0;
     if (VIDEO_COMPLETE_BASELINE.has(name)) videoDone = videoMin;
     else if (name in VIDEO_PARTIAL_BASELINE) videoDone = VIDEO_PARTIAL_BASELINE[name];
-    subjects[name] = { videoTotal: videoMin, pagesTotal: pages, videoDone, pagesDone: 0 };
+    subjects[name] = { videoTotal: videoMin, pagesTotal: pages, videoDone, pagesDone: 0, readingRenewed: false };
   });
   return subjects;
 }
@@ -152,6 +152,9 @@ function loadState(){
     if (parsed.subjects && (!parsed.logs || parsed.logs.length === 0)){
       parsed.subjects = buildBaselineSubjects();
     }
+    if (parsed.subjects){
+      Object.values(parsed.subjects).forEach(s=>{ if (s.readingRenewed === undefined) s.readingRenewed = false; });
+    }
     return parsed;
   }catch(e){
     const s = seedState();
@@ -174,6 +177,47 @@ function currentPhase(){
   if (!videoPhaseComplete()) return "video";
   if (!readingPhaseComplete()) return "reading";
   return "mixed";
+}
+
+// Resets a completed subject's progress so it can be studied again from
+// scratch (a revision pass). Renewing reading also flips readingRenewed on
+// and records the pace (min/page) the person chose for this revision pass —
+// from then on that subject's ideal reading pace is whatever they set here,
+// instead of the 15 min/page used for a first read.
+function renewSubject(name, kind, pace){
+  const s = state.subjects[name];
+  if (!s) return false;
+  if (kind === "video"){
+    s.videoDone = 0;
+  } else if (kind === "reading"){
+    s.pagesDone = 0;
+    s.readingRenewed = true;
+    if (pace && pace > 0) s.readingPace = pace;
+  } else {
+    return false;
+  }
+  saveState(state);
+  return true;
+}
+
+// Ideal reading pace for a subject, in minutes/page — 15 min/page until that
+// subject's reading has been renewed (a revision pass), after which it's
+// whatever pace was chosen at renewal time. Used to judge how much of a
+// sitting's time actually went into reading (instead of the flat XP weight,
+// which is tuned for scoring, not pace).
+function idealMinPerPageForSubject(subject){
+  const s = subject ? state.subjects[subject] : null;
+  return (s && s.readingRenewed && s.readingPace) ? s.readingPace : 15;
+}
+
+// Most recently logged subject (across any log type) — used to default the
+// subject picker to whatever was studied last instead of always the first
+// subject in the table.
+function lastUsedSubject(){
+  for (let i = state.logs.length - 1; i >= 0; i--){
+    if (state.logs[i].subject) return state.logs[i].subject;
+  }
+  return null;
 }
 
 /* ================= SCORING / XP ================= */
@@ -650,7 +694,7 @@ function sessionOutputMinutes(session){
   const entries = sessionLogEntries(session);
   return entries.reduce((sum, entry)=>{
     if (entry.type === "video") return sum + entry.amount * W_VIDEO;
-    if (entry.type === "reading") return sum + entry.amount * W_PAGE;
+    if (entry.type === "reading") return sum + entry.amount * idealMinPerPageForSubject(entry.subject);
     if (entry.type === "mcq") return sum + entry.amount * W_MCQ;
     return sum; // plain focus — time sat, but nothing concrete logged
   }, 0);
@@ -678,6 +722,26 @@ function sessionEfficiencyTrend(dateStr){
   });
   _sessionTrendCache = { key, result };
   return result;
+}
+
+// Per-sitting reading pace: for every sitting that had reading logged, how
+// many pages were actually read vs how many the ideal pace (15 min/page
+// first pass, 8 min/page once that subject's reading has been renewed)
+// would predict for that sitting's duration. gap = actual - ideal, so a
+// negative gap means fewer pages than ideal for the time spent.
+// Sittings with no reading logged are skipped entirely (nothing to compare).
+function readingPaceTrend(dateStr){
+  const list = focusSessionsForDate(dateStr);
+  return list.map((s,i)=>{
+    const amounts = sessionTypeAmounts(s);
+    if (!amounts.reading) return null;
+    const readingEntry = sessionLogEntries(s).find(e => e.type === "reading");
+    const subject = readingEntry ? readingEntry.subject : null;
+    const pace = idealMinPerPageForSubject(subject);
+    const idealPages = s.durationMin / pace;
+    const gap = amounts.reading - idealPages;
+    return { index: i+1, subject, actualPages: amounts.reading, idealPages, gap, pace, durationMin: s.durationMin };
+  }).filter(Boolean);
 }
 
 // Session-by-session trend for one date: each entry knows how it compares

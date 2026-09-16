@@ -264,6 +264,12 @@
       </div>
     </div>
 
+    <div class="sec-head"><div class="sec-title">Aaj: Reading pace vs ideal</div><div class="sec-sub">har reading sitting mein pages, ideal pace se kam/zyada</div></div>
+    <div class="chart-card glass">
+      <canvas id="readingPaceChart"></canvas>
+      <div class="best-sit-verdict" id="readingPaceVerdict" style="margin-top:10px;"></div>
+    </div>
+
     <div class="sec-head"><div class="sec-title">Aaj ke sessions</div><div class="sec-sub" id="todayFocusTotal">0m total</div></div>
     <div class="sitting-table-wrap" id="sessionListTableWrap"></div>
 
@@ -823,8 +829,8 @@ document.getElementById("swBtn").addEventListener("click", ()=>{
 });
 
 /* ---- Log-detail card (shown right after Stop) ---- */
-function subjectOptionsHtml(){
-  return SUBJECT_TABLE.map(([name]) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`).join("");
+function subjectOptionsHtml(selected){
+  return SUBJECT_TABLE.map(([name]) => `<option value="${escapeHtml(name)}" ${name===selected ? "selected" : ""}>${escapeHtml(name)}</option>`).join("");
 }
 function renderLogDetailCard(){
   const card = document.getElementById("logDetailCard");
@@ -838,12 +844,12 @@ function renderLogDetailCard(){
     <div class="logdetail-sub">${rangeLabel} — kya padha, jo bhi apply ho wahi bharo (baaki khaali chhod do):</div>
     <div class="field" style="margin-top:12px;">
       <label>Subject</label>
-      <select id="ld_subject">${subjectOptionsHtml()}</select>
+      <select id="ld_subject">${subjectOptionsHtml(lastUsedSubject())}</select>
     </div>
     <div class="field">
       <label>🎥 Video watched</label>
       <div class="amount-row">
-        <input type="number" id="ld_video" min="0" placeholder="0" value="${pendingSession.durationMin}" />
+        <input type="number" id="ld_video" min="0" placeholder="0" value="" />
         <div class="unit-pill">min</div>
       </div>
     </div>
@@ -1252,6 +1258,74 @@ function renderSessionBreakdownChart(){
   });
 }
 
+/* ---- Reading pace vs ideal: for every sitting that had reading logged,
+   how many pages more/fewer than the ideal pace (15 min/page normally,
+   8 min/page once that subject's reading has been renewed) were actually
+   read. Diverging bars around a zero line — above is ahead of ideal (mint),
+   below is behind (coral). ---- */
+function renderReadingPaceChart(){
+  const canvas = document.getElementById("readingPaceChart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.clientWidth, h = canvas.clientHeight || 150;
+  canvas.width = w*dpr; canvas.height = h*dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+
+  const trend = readingPaceTrend(todayStr());
+  const verdictEl = document.getElementById("readingPaceVerdict");
+
+  if (!trend.length){
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 11px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.fillText("Aaj abhi koi reading nahi hui", w/2, h/2);
+    verdictEl.textContent = "Reading log karo — phir yahan ideal pace se comparison dikhega.";
+    return;
+  }
+
+  const padTop = 18, padBottom = 18, padSide = 10;
+  const n = trend.length;
+  const gap = 12;
+  const barW = Math.max(20, (w - padSide*2 - gap*(n-1)) / n);
+  const zeroY = padTop + (h - padTop - padBottom) / 2;
+  const halfH = (h - padTop - padBottom) / 2 - 12;
+  const maxGap = Math.max(1, ...trend.map(s => Math.abs(s.gap)));
+
+  ctx.strokeStyle = "#2A3348";
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(padSide, zeroY); ctx.lineTo(w-padSide, zeroY); ctx.stroke();
+
+  trend.forEach((s,i)=>{
+    const x = padSide + i*(barW+gap);
+    const barH = Math.max(2, (Math.abs(s.gap)/maxGap) * halfH);
+    const ahead = s.gap >= 0;
+    const y = ahead ? zeroY - barH : zeroY;
+    ctx.fillStyle = ahead ? "#00E5A8" : "#FF6B4A";
+    roundRectStudy(ctx, x, y, barW, barH, 4);
+    ctx.fill();
+
+    ctx.fillStyle = "#E9EEF7";
+    ctx.font = "700 9px 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    const label = `${ahead ? "+" : ""}${s.gap.toFixed(1)}p`;
+    ctx.fillText(label, x+barW/2, ahead ? y-5 : y+barH+11);
+
+    ctx.fillStyle = "#5E6A82";
+    ctx.font = "600 8px 'JetBrains Mono', monospace";
+    ctx.fillText(`#${s.index}`, x+barW/2, h-4);
+  });
+
+  const avgGap = trend.reduce((sum,s)=>sum+s.gap,0) / trend.length;
+  const totalActual = trend.reduce((sum,s)=>sum+s.actualPages,0);
+  const totalIdeal = trend.reduce((sum,s)=>sum+s.idealPages,0);
+  if (avgGap >= 0){
+    verdictEl.textContent = `Aaj total ${Math.round(totalActual)} pages padhe vs ideal ${Math.round(totalIdeal)} — average ${avgGap.toFixed(1)} pages/sitting ideal se aage! 🚀`;
+  } else {
+    verdictEl.textContent = `Aaj total ${Math.round(totalActual)} pages padhe vs ideal ${Math.round(totalIdeal)} — average ${Math.abs(avgGap).toFixed(1)} pages/sitting kam, thoda pace badhao.`;
+  }
+}
+
 /* ---- Reusable: sitting-by-sitting breakdown table — duration, subject,
    and how much video/pages/mcq were done in that sitting. Only the columns
    that actually apply to a sitting's phase (video-only / reading-only /
@@ -1305,11 +1379,12 @@ function renderComboStrip(){
 
 function renderLogForm(phase){
   const card = document.getElementById("logCard");
+  const defaultSubject = lastUsedSubject();
   if (phase === "video"){
     card.innerHTML = `
       <div class="field">
         <label>Subject</label>
-        <select id="f_subject">${subjectOptionsHtml()}</select>
+        <select id="f_subject">${subjectOptionsHtml(defaultSubject)}</select>
       </div>
       <div class="field">
         <label>Minutes watched</label>
@@ -1324,7 +1399,7 @@ function renderLogForm(phase){
     card.innerHTML = `
       <div class="field">
         <label>Subject</label>
-        <select id="f_subject">${subjectOptionsHtml()}</select>
+        <select id="f_subject">${subjectOptionsHtml(defaultSubject)}</select>
       </div>
       <div class="field">
         <label>Pages read</label>
@@ -1347,7 +1422,7 @@ function renderLogForm(phase){
       </div>
       <div class="field" id="f_subject_field">
         <label>Subject</label>
-        <select id="f_subject">${subjectOptionsHtml()}</select>
+        <select id="f_subject">${subjectOptionsHtml(defaultSubject)}</select>
       </div>
       <div class="field">
         <label id="f_amount_label">Minutes watched</label>
@@ -1480,7 +1555,7 @@ function renderSubjectGrid(){
     const complete = pct >= 100;
     const metaText = kind === "video"
       ? `${fmtMin(done)} / ${fmtMin(total)}`
-      : `${Math.round(done)} / ${total} pages`;
+      : `${Math.round(done)} / ${total} pages${s.readingRenewed ? ` · renewed @${s.readingPace}min/page` : ""}`;
     return `
       <div class="subj-card glass ${complete?'complete':''}" data-name="${escapeHtml(name)}">
         ${complete ? '<div class="check-badge"><svg viewBox="0 0 24 24" fill="none"><path d="M5 13l4 4L19 7" stroke="#052A20" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg></div>' : ''}
@@ -1492,10 +1567,35 @@ function renderSubjectGrid(){
           </div>
         </div>
         <div class="subj-meta">${metaText}</div>
+        ${complete ? `<button type="button" class="subj-renew-btn" data-name="${escapeHtml(name)}" data-kind="${kind}">↻ Renew</button>` : ''}
       </div>
     `;
   }).join("");
 }
+document.getElementById("subjectGrid").addEventListener("click", (e)=>{
+  const btn = e.target.closest(".subj-renew-btn");
+  if (!btn) return;
+  const name = btn.dataset.name, kind = btn.dataset.kind;
+  if (kind === "reading"){
+    const input = prompt(`${name} ka reading renew — naya ideal pace kya rakhein? (min/page)`, "8");
+    if (input === null) return; // cancelled
+    const pace = parseFloat(input);
+    if (!pace || pace <= 0){ toast("Valid pace do (min/page)"); return; }
+    if (renewSubject(name, "reading", pace)){
+      vibrate(40); toast(`${name} renew ho gaya — ideal pace ab ${pace} min/page ✓`);
+      renderSubjectGrid();
+      renderLogForm(currentPhase());
+    }
+  } else {
+    const ok = confirm(`${name} ka video progress renew karein? Yeh 0% se dobara shuru ho jayega.`);
+    if (!ok) return;
+    if (renewSubject(name, "video")){
+      vibrate(40); toast(`${name} renew ho gaya — 0% se dobara shuru ✓`);
+      renderSubjectGrid();
+      renderLogForm(currentPhase());
+    }
+  }
+});
 function ringSvg(pct, complete){
   const r = 16, c = 2*Math.PI*r;
   const off = c - (c*pct/100);
@@ -1514,6 +1614,7 @@ function refreshStudyView(){
   renderSessionTrendChart();
   renderSessionEfficiencyChart();
   renderSessionBreakdownChart();
+  renderReadingPaceChart();
   const phaseNow = currentPhase();
   renderLogForm(phaseNow);
   renderSubjectGrid();
