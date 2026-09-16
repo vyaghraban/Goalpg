@@ -437,6 +437,27 @@
 
 <script src="./app.js"></script>
 <script>
+/* ================= CHART SAFETY ================= */
+// Every canvas chart sizes itself from canvas.clientWidth, then immediately
+// sets canvas.width (the drawing-buffer size) from that same value. If a
+// canvas's CSS width rule is ever missing, stale-cached, or fails to load,
+// clientWidth falls back to reading the canvas's OWN width attribute —
+// which we just set — creating a feedback loop where every re-render makes
+// the canvas (and the page around it) wider, without bound. This happened
+// once already (sessionBreakdownChart) purely because its CSS rule was
+// missing. Routing every chart's width through this helper instead of
+// canvas.clientWidth directly caps it at the viewport width no matter what,
+// so a missing/stale CSS rule can only ever make a chart render wrong —
+// never runaway and break the page layout.
+function safeCanvasWidth(canvas, fallback){
+  const raw = canvas.clientWidth || fallback || 300;
+  const cap = window.innerWidth || 480;
+  return Math.min(raw, cap);
+}
+function safeCanvasHeight(canvas, fallback){
+  const raw = canvas.clientHeight || fallback || 150;
+  return Math.min(raw, 600); // no chart is ever legitimately taller than this
+}
 /* ================= VIEW SWITCHING ================= */
 let currentView = "home";
 function switchView(name, scrollId){
@@ -473,7 +494,7 @@ function drawEkg(ts){
   if (ekgStartTs === null) ekgStartTs = ts || performance.now();
   const canvas = document.getElementById("ekg");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 88;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 88);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1025,7 +1046,7 @@ function weekComparisonTableHtml(report){
 function renderSessionTrendChart(){
   const canvas = document.getElementById("sessionTrendChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 140);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1111,7 +1132,7 @@ function renderSessionTrendChart(){
 function renderSessionEfficiencyChart(){
   const canvas = document.getElementById("sessionEfficiencyChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 140;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 140);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1194,7 +1215,7 @@ function renderSessionEfficiencyChart(){
 function renderSessionBreakdownChart(){
   const canvas = document.getElementById("sessionBreakdownChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 150;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 150);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1266,7 +1287,7 @@ function renderSessionBreakdownChart(){
 function renderReadingPaceChart(){
   const canvas = document.getElementById("readingPaceChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 150;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 150);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1647,7 +1668,7 @@ function roundRect(ctx,x,y,w,h,r){
 function renderTrendChart(){
   const canvas = document.getElementById("trendChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 110);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1774,7 +1795,7 @@ function renderWeekReport(){
 function renderWeekBar(report){
   const canvas = document.getElementById("weekBarChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 130;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 130);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
@@ -1813,7 +1834,7 @@ function renderWeekBar(report){
 function renderWeekCum(report){
   const canvas = document.getElementById("weekCumChart");
   const dpr = window.devicePixelRatio || 1;
-  const w = canvas.clientWidth, h = canvas.clientHeight || 110;
+  const w = safeCanvasWidth(canvas), h = safeCanvasHeight(canvas, 110);
   canvas.width = w*dpr; canvas.height = h*dpr;
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
